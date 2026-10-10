@@ -89,3 +89,31 @@
 - كل جلسة كتبدا فـ سيرفر جديد، ولكن الديسك ديالك كيرجع كيف ما هو.
 - ما تستعملش هادشي لحوايج كتخالف
   [شروط GitHub Actions](https://docs.github.com/en/site-policy/github-terms/github-terms-for-additional-products-and-features#actions).
+
+---
+
+## 📱 تطبيق NOVA Windows Cloud (Android)
+
+هاد الريبو فيه حتى تطبيق Flutter كامل (`lib/` + `android/`) كيكون لوحة تحكم لنفس السيستيم:
+تدخل بـ GitHub، تختار الريبو، كتب الأسرار فالابليكاسيون وكتضاف بوحدها لـ GitHub Secrets،
+تشغّل الويندوز، تتابع المراحل، وتشوف رابط الجلسة وTailscale — كلشي من الهاتف.
+
+### الأمان فال تطبيق
+- **GitHub App + PKCE** (بلا Client Secret داخل الـ APK).
+- الأسرار كتشفرو فالهاتف بـ **crypto_box_seal** (X25519 + XSalsa20-Poly1305 + Blake2b)
+  قبل ما يتبعتو لـ GitHub API — نفس الطريقة الرسمية ديال GitHub.
+- التوكن كيتخزن غير فـ **Android Keystore** (flutter_secure_storage).
+
+### بناء الـ APK
+كيتم أوتوماتيكيا مع كل push لـ `main` عبر `.github/workflows/build-apk.yml`:
+- الـ APK كيبان فـ **Actions → Build APK → Artifacts**،
+- وكيتنشر حتى كـ Release ثابت برابط تحميل مباشر:
+  `.../releases/download/apk-latest/NOVA-Windows-Cloud.apk`
+
+### الإعداد (مرة وحدة)
+1. فصّفحة الـ GitHub App ديالك، تأكد بلي الـ Callback URL هو:
+   `novawindowscloud://oauth/callback`
+2. الصلاحيات المطلوبة فالـ GitHub App:
+   Actions (R/W)، Secrets (R/W)، Contents (R/W)، Administration (R/W اختياري لإنشاء ريبو)، Profile (R).
+3. ثبّت الـ App على الريبو ديالك (Install App).
+4. شغّل الـ APK، سجل الدخول، اختار الريبو، دخل الأسرار، وشغّل Windows. 🚀

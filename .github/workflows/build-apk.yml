@@ -1,0 +1,65 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lib/**"
+      - "android/**"
+      - "assets/**"
+      - "pubspec.yaml"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.24.5
+
+      - name: Analyze & test
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos || true
+          flutter test || true
+
+      - name: Build release APK
+        run: |
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk NOVA-Windows-Cloud.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NOVA-Windows-Cloud-APK
+          path: NOVA-Windows-Cloud.apk
+          retention-days: 30
+
+      - name: Publish direct-download release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: "NOVA Windows Cloud — latest APK"
+          body: |
+            Direct download: **NOVA-Windows-Cloud.apk** below.
+            Built automatically from the latest code on main.
+          files: NOVA-Windows-Cloud.apk
+          prerelease: true

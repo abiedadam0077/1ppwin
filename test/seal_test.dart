@@ -67,4 +67,22 @@ void main() {
 
     expect(() => GitHubSeal.open(tampered, seed), throwsStateError);
   });
+
+  test('open rejects a forged empty-message authentication tag', () async {
+    final forged = base64Decode(sodiumSealedVectors[0]!);
+    forged[32] ^= 0xFF;
+    expect(
+      () => GitHubSeal.open(forged, base64Decode(sodiumRecipientSeed)),
+      throwsStateError,
+    );
+  });
+
+  test('seal rejects an invalid recipient key length', () async {
+    expect(() => GitHubSeal.seal(Uint8List(0), Uint8List(31)), throwsArgumentError);
+  });
+
+  test('open rejects a truncated sealed message', () async {
+    expect(() => GitHubSeal.open(Uint8List(47), Uint8List(32)), throwsArgumentError);
+  });
+
 }

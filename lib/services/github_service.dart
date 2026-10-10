@@ -38,11 +38,11 @@ class Repo {
       );
 }
 
-class StepState {
+class WorkflowStepState {
   final String name;
   final String status; // queued | in_progress | completed
   final String? conclusion; // success | failure | skipped ...
-  StepState(this.name, this.status, this.conclusion);
+  WorkflowStepState(this.name, this.status, this.conclusion);
 }
 
 class BackupInfo {
@@ -200,13 +200,13 @@ class GitHubService {
     }
   }
 
-  Future<List<StepState>> runSteps(String repo, int runId) async {
+  Future<List<WorkflowStepState>> runSteps(String repo, int runId) async {
     final j = await _send('GET', '/repos/$repo/actions/runs/$runId/jobs');
     final jobs = (j as Map<String, dynamic>)['jobs'] as List? ?? [];
     if (jobs.isEmpty) return [];
     final steps = (jobs.first as Map<String, dynamic>)['steps'] as List? ?? [];
     return steps
-        .map((s) => StepState(
+        .map((s) => WorkflowStepState(
               s['name'] as String? ?? '',
               s['status'] as String? ?? 'queued',
               s['conclusion'] as String?,

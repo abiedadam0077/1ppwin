@@ -20,6 +20,7 @@ android/app/release/
 *.keystore
 
 # Editors and local environment
+__pycache__/
 .idea/
 .vscode/
 *.iml
@@ -30,4 +31,5 @@ android/app/release/
 # Downloaded bundles, CI logs and generated APKs
 google_drive/
 .arena/
+.ci/
 *.apk

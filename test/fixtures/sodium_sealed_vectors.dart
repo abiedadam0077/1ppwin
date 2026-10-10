@@ -1,0 +1,18 @@
+// Generated with PyNaCl / libsodium crypto_box_seal, not the Dart implementation.
+// This fixed private key is a public test fixture, never an application secret.
+const sodiumRecipientSeed = 'AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw=';
+const sodiumRecipientPublicKey = 'u1D/noKldM+/gg6X9g+5wUPsdBXPUU+M/Zjv9Z4FlhQ=';
+const sodiumEmptyMessageNonce = '04+LFqY37liIje9+c4wocB1Q35QMKGiB';
+const sodiumSealedVectors = <int, String>{
+  0: 'iWUboLiDnAAQPTYNn11Po8W816IwMgqXUZ8/Iy0tQ3w/h+PthXSME7Aa9XQT5XWM',
+  1: 'X7KVFMo+Z+8AOkQQlk89MW28YG+JROroCQJna4BpIGD9Or/K3SkVVIV2iwKyuR4Esg==',
+  31: 'ImUBATbcVplyd3EGNIrK+5FcHpA6/TEn1g9bTvJvIS90JmX5jZW3aJRNGu9Nvlfu61fcnZK9NA8v43X20+HFIgH9KZo/+8vJBBXJp8rcFQ==',
+  32: 'lzgwcbXEIVjcoZgSpDXi73xLoBabIn1EQorRqiZnX0budEc/q2g/EB78vmK2IZD3ZJ9V0e2JAthBPXgw+tstuq2mZ8oAxRwsUZ4l7TjUtaw=',
+  33: 'T8vio9lzbWySO6BIEZcjdi6ejcySl60QbmIS4WK0QVueyN5hQxD8L3RF6f4fLTyO+LmJet9JTF9r09vnk2o5M2j/r/TmkfeNoKJdh2Sh7XjX',
+  63: 'AraP1iMZORzOx3+3GzbyxcaS2+1rA/WDYZrOg1/OtXDD7SvWQd3nZI8J4A3F/7RaSKyjW73H1h6lLolm/OlCT1oxKaCkkIVaNjIl5ykSghF+7wELqE7nLG9VjiD+mHFrFDuG3FPAwAQsPR7SWH+S',
+  64: 'bmTVItccAeX/o/RdcUMclDOY3TYJHMyQbL091a/38nPjM8OR1sF7YYKRP91cPGkQqQc04xi9oRI3DsoK4nRepF8vdlNzZpRMWOyoE8z7nNogNfCfz+jLNiT6mUxIQNRE2Woxc6l1wuqxbPYZzfRr8w==',
+  65: 'VQkVt59t1S6IVCAqyqM/2+ETB8tTldFQjEF/KjyD2mHoA3Q4xXqq5f9O9LVDkeAkFGx3UNN7oM0I1KNtKCoVeQRg1NBEmw9q1RK51i2vsFol7DhAEf1Gj3DKByweFPCs8K+5hkjsONLztpDv+7A6QQ8=',
+  96: 'Klz/Fh8XLQuccHqWdC+g8YY7qEEUYLu3MDWsZ0DXc1q7KN/bqQriNZX912Zd7RzRSJbHotpj8VbQORXG67J540ynSCIHQYItVF78tA+ytrqbae3BDWH2tuZun+QB1wL8N9IcHjq1rFzRPK6sb+zcyaZ47yHk6DGOhPRywkCcEKVqocwMOMXz3DC1lRgq6JH8',
+  128: 'o5G7oSosZNMIYouTOtqDyiQ4V1aZgddUpsnwvQ0HvhPcfKdqMSiQqc6y26jsCC5ijYLpGsNlnScZEY1AxQOGvevOGmWkcpHwMTv9FrMXXXAcZJhX1X2p1FeKrCTyW9k5CR0VWbp2N+XNXdDnHqnxFOfmcqtRmQ0eEYkz7ivWcJHggyUO0okA+W2/5bKEaa1CdijjIGCamDm6Clll4PyFx+mJj/letdkAFMrl/k8/VEE=',
+  256: 'VknAOqHCnCkqa32DWxARX08xllLyLeNcaHZYGykVIkynEP1FT745mfu40LCni0JkFepwocBkWiLExLW3O5Vk9/7qzPDjAYhEWuFJVUFA5mmjXgnfWZRO1awEBdpA3wQzBfvVsLtfXpC5T71MIgGhv//nm2a6NQa6UuPT9eq50zQBP791DJFeoph3BVp8ZjZvcPzX8WBmR3gIpdfaw9u8q5NqV+SmFb4J71zNS8wY40+qW0DDilIrXLxuo67LFSq9qYrdk7mcoLvCxdj7dYFtaUU/N3a62oOWG+7o7f8wkNHsdj8x/j0LFdmqz94tAt4rA8Yvfo2ANryUmbUGxalEIups/MMA8ZHIjeHYSi6XjXGu3mdzWmR/zSVgW0u3EC2+t0/T8Al+XzPsMRWgT3AFOQ==',
+};

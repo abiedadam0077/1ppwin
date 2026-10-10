@@ -4,7 +4,7 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.3.0 <4.0.0"
+  sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -14,10 +14,12 @@ dependencies:
   provider: ^6.1.2
   http: ^1.2.2
   url_launcher: ^6.3.0
-  app_links: ^6.3.2
+  # 6.4.x uses a Gradle Flutter extension unavailable in Flutter 3.24.
+  app_links: 6.3.2
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.3.2
   cryptography: ^2.7.0
+  pinenacl: ^0.6.0
   google_fonts: ^6.2.1
   archive: ^3.6.1
 

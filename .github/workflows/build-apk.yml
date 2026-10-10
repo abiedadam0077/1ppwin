@@ -73,6 +73,12 @@ jobs:
             exit 1
           fi
 
+      - name: Report check results
+        if: ${{ always() }}
+        env:
+          BUILD_STATUS: ${{ job.status }}
+        run: python3 .github/scripts/report-build-diagnostics.py
+
       - name: Build release APK
         # Collect Android diagnostics even if the analyzer/tests found an error.
         # A failed check still fails the job and prevents publication below.

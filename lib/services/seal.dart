@@ -141,7 +141,7 @@ class GitHubSeal {
     }
     final r = _rounds(x);
     final out = ByteData(32);
-    const idx = [0, 1, 2, 3, 12, 13, 14, 15];
+    const idx = [0, 5, 10, 15, 6, 7, 8, 9];
     for (var i = 0; i < 8; i++) {
       out.setUint32(i * 4, r[idx[i]], Endian.little);
     }

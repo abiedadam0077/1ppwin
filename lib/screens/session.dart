@@ -142,7 +142,7 @@ class ProgressScreen extends StatefulWidget {
 
 class _ProgressScreenState extends State<ProgressScreen> {
   Timer? _timer;
-  List<StepState> _steps = [];
+  List<WorkflowStepState> _steps = [];
   Map<String, dynamic>? _run;
   String? _error;
 
@@ -206,7 +206,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return s != null && s.status == 'in_progress';
   }
 
-  StepState? _stepByName(String n) {
+  WorkflowStepState? _stepByName(String n) {
     for (final s in _steps) {
       if (s.name == n) return s;
     }
@@ -270,7 +270,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     } else if (needed.isEmpty) {
       state = 'pending';
     } else {
-      final sts = needed.map(_stepByName).whereType<StepState>().toList();
+      final sts = needed.map(_stepByName).whereType<WorkflowStepState>().toList();
       if (sts.isNotEmpty && sts.every((s) => s.status == 'completed' && s.conclusion == 'success')) {
         state = 'done';
       } else if (sts.any((s) => s.status == 'in_progress') || (sts.any((s) => s.status == 'completed'))) {

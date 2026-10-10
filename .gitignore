@@ -20,6 +20,7 @@ android/app/release/
 *.keystore
 
 # Editors and local environment
+__pycache__/
 .idea/
 .vscode/
 *.iml

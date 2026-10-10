@@ -12,6 +12,7 @@ on:
       - "pubspec.lock"
       - "analysis_options.yaml"
       - ".github/workflows/build-apk.yml"
+      - ".github/scripts/**"
   pull_request:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - "pubspec.lock"
       - "analysis_options.yaml"
       - ".github/workflows/build-apk.yml"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 permissions:
@@ -80,20 +82,11 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk NOVA-Windows-Cloud.apk
           sha256sum NOVA-Windows-Cloud.apk > NOVA-Windows-Cloud.apk.sha256
 
-      - name: Report failure diagnostics
-        if: ${{ failure() }}
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          # Expose useful failure details through the GitHub Checks API, too.
-          for log in sorted(Path('.ci').glob('*.log')):
-              text = log.read_text(errors='replace')[-18000:]
-              text = re.sub(r'\x1b\[[0-9;]*m', '', text)
-              text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-              print(f'::error title={log.name}::{text}')
-          PY
+      - name: Report build diagnostics
+        if: ${{ always() }}
+        env:
+          BUILD_STATUS: ${{ job.status }}
+        run: python3 .github/scripts/report-build-diagnostics.py
 
       - name: Upload build diagnostics
         if: ${{ always() }}

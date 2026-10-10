@@ -80,9 +80,7 @@ jobs:
         run: python3 .github/scripts/report-build-diagnostics.py
 
       - name: Build release APK
-        # Collect Android diagnostics even if the analyzer/tests found an error.
-        # A failed check still fails the job and prevents publication below.
-        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        # Compile and publish only after the analyzer and tests both pass.
         run: |
           flutter build apk --release 2>&1 | tee .ci/build.log
           cp build/app/outputs/flutter-apk/app-release.apk NOVA-Windows-Cloud.apk

@@ -69,9 +69,11 @@ jobs:
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Check secrets
+        id: secrets
         env:
           BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
           ACCESS_PASSWORD: ${{ secrets.ACCESS_PASSWORD }}
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
         run: |
           ok=1
           if [ -z "$BACKUP_PASSWORD" ]; then
@@ -81,6 +83,11 @@ jobs:
           if [ -z "$ACCESS_PASSWORD" ]; then
             echo "::error::Secret ACCESS_PASSWORD is missing. Add it in Settings → Secrets and variables → Actions."
             ok=0
+          fi
+          if [ -n "$TAILSCALE_AUTHKEY" ]; then
+            echo "tailscale=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tailscale=false" >> "$GITHUB_OUTPUT"
           fi
           [ "$ok" = 1 ] || exit 1
 
@@ -236,9 +243,9 @@ jobs:
           echo "=============================================================="
 
       - name: Connect Tailscale (optional, for RDP)
+        if: ${{ steps.secrets.outputs.tailscale == 'true' }}
         env:
           TS_KEY: ${{ secrets.TAILSCALE_AUTHKEY }}
-        if: ${{ secrets.TAILSCALE_AUTHKEY != '' }}
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey "$TS_KEY" --hostname "win11-github" --accept-routes=false

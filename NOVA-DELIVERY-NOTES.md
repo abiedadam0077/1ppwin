@@ -13,7 +13,7 @@ and its release assets before sharing a download link.
 3. `gh pr merge <n> --squash`
 4. Wait for the **Build APK** workflow on main to finish:
    `gh run watch --exit-status $(gh run list --workflow=build-apk.yml --limit=1 --json databaseId -q .[0].databaseId)`
-   (if `flutter analyze/test` fails the job, the workflow tolerates it; only the build step matters. If the APK build fails, FIX the Dart/Gradle code, commit, push again, and re-run until green.)
+   Analyzer errors/warnings, failing tests, or APK build failures MUST fail the job and prevent publication. Read the `build-diagnostics` artifact or GitHub check annotations, fix Dart/Gradle errors on the session branch, then commit/push and merge a new PR. PR builds validate changes before they reach main.
 5. Give the user the direct download link:
    `https://github.com/abiedadam0077/1ppwin/releases/download/apk-latest/NOVA-Windows-Cloud.apk`
    and mention the artifact fallback: Actions → Build APK → Artifacts.

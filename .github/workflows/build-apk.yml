@@ -7,7 +7,21 @@ on:
       - "lib/**"
       - "android/**"
       - "assets/**"
+      - "test/**"
       - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
+      - ".github/workflows/build-apk.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "lib/**"
+      - "android/**"
+      - "assets/**"
+      - "test/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
@@ -15,51 +29,106 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-apk
+  group: build-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.24.5
+          flutter-version: "3.24.5"
+          cache: true
+
+      - name: Resolve dependencies
+        id: dependencies
+        run: |
+          mkdir -p .ci
+          flutter pub get 2>&1 | tee .ci/pub-get.log
 
       - name: Analyze & test
         run: |
-          flutter pub get
-          flutter analyze --no-fatal-infos || true
-          flutter test || true
+          # Run both checks, but preserve their exit codes rather than hiding failures.
+          set +e
+          flutter analyze --no-fatal-infos 2>&1 | tee .ci/analyze.log
+          analyze_status=$?
+          flutter test --reporter expanded 2>&1 | tee .ci/test.log
+          test_status=$?
+          if [ "$analyze_status" -ne 0 ] || [ "$test_status" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Build release APK
+        # Collect Android diagnostics even if the analyzer/tests found an error.
+        # A failed check still fails the job and prevents publication below.
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
         run: |
-          flutter build apk --release
+          flutter build apk --release 2>&1 | tee .ci/build.log
           cp build/app/outputs/flutter-apk/app-release.apk NOVA-Windows-Cloud.apk
+          sha256sum NOVA-Windows-Cloud.apk > NOVA-Windows-Cloud.apk.sha256
+
+      - name: Report failure diagnostics
+        if: ${{ failure() }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          # Expose useful failure details through the GitHub Checks API, too.
+          for log in sorted(Path('.ci').glob('*.log')):
+              text = log.read_text(errors='replace')[-18000:]
+              text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+              text = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error title={log.name}::{text}')
+          PY
+
+      - name: Upload build diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: |
+            .ci/*.log
+            pubspec.lock
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: NOVA-Windows-Cloud-APK
-          path: NOVA-Windows-Cloud.apk
+          path: |
+            NOVA-Windows-Cloud.apk
+            NOVA-Windows-Cloud.apk.sha256
+          if-no-files-found: error
           retention-days: 30
 
       - name: Publish direct-download release
+        if: ${{ success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
+          target_commitish: ${{ github.sha }}
           name: "NOVA Windows Cloud — latest APK"
           body: |
             Direct download: **NOVA-Windows-Cloud.apk** below.
-            Built automatically from the latest code on main.
-          files: NOVA-Windows-Cloud.apk
+            Built and tested automatically from commit `${{ github.sha }}` on main.
+            SHA-256 checksum: **NOVA-Windows-Cloud.apk.sha256**.
+          files: |
+            NOVA-Windows-Cloud.apk
+            NOVA-Windows-Cloud.apk.sha256
+          fail_on_unmatched_files: true
           prerelease: true

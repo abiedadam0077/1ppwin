@@ -30,4 +30,5 @@ android/app/release/
 # Downloaded bundles, CI logs and generated APKs
 google_drive/
 .arena/
+.ci/
 *.apk

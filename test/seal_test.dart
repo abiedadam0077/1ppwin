@@ -5,7 +5,19 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nova_windows_cloud/services/seal.dart';
 
+import 'fixtures/sodium_sealed_vectors.dart';
+
 void main() {
+  for (final entry in sodiumSealedVectors.entries) {
+    test('opens libsodium sealed box (${entry.key} message bytes)', () async {
+      final opened = await GitHubSeal.open(
+        base64Decode(entry.value),
+        base64Decode(sodiumRecipientSeed),
+      );
+      expect(opened, List.generate(entry.key, (i) => i % 256));
+    });
+  }
+
   test('sealed layout: 32-byte ephemeral pubkey + 16-byte tag + ciphertext', () async {
     final seed = Uint8List.fromList(List.generate(32, (i) => i + 1));
     final recipient = await X25519().newKeyPairFromSeed(seed);

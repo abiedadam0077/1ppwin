@@ -22,7 +22,7 @@ class GitHubSeal {
     );
     final shared = Uint8List.fromList(await sharedSecret.extractBytes());
 
-    final nonceDigest = await Blake2b(hashLength: 24)
+    final nonceDigest = await Blake2b(hashLengthInBytes: 24)
         .hash(Uint8List.fromList([...ephPub, ...recipientPkBytes]));
     final nonce = Uint8List.fromList(nonceDigest.bytes);
 
@@ -42,7 +42,7 @@ class GitHubSeal {
       remotePublicKey: SimplePublicKey(ephPub, type: KeyPairType.x25519),
     );
     final sharedBytes = Uint8List.fromList(await shared.extractBytes());
-    final nonceDigest = await Blake2b(hashLength: 24).hash(Uint8List.fromList([...ephPub, ...recipientPub]));
+    final nonceDigest = await Blake2b(hashLengthInBytes: 24).hash(Uint8List.fromList([...ephPub, ...recipientPub]));
     final nonce = Uint8List.fromList(nonceDigest.bytes);
     return _cryptoBoxOpen(box, nonce, sharedBytes);
   }
@@ -57,19 +57,12 @@ class GitHubSeal {
     final tag = box.sublist(0, 16);
     final ct = box.sublist(16);
     final check = _poly1305(polyKey, ct);
+    var difference = 0;
     for (var i = 0; i < 16; i++) {
-      if (check[i] != tag[i]) throw StateError('poly1305 tag mismatch');
+      difference |= check[i] ^ tag[i];
     }
-    final out = Uint8List(ct.length);
-    var counter = 1;
-    for (var i = 0; i < ct.length; i += 64) {
-      final ks = _salsa20Block(subKey, nonce8, counter++);
-      final end = (i + 64 > ct.length) ? ct.length : i + 64;
-      for (var j = i; j < end; j++) {
-        out[j] = ct[j] ^ ks[j - i];
-      }
-    }
-    return out;
+    if (difference != 0) throw StateError('poly1305 tag mismatch');
+    return _xsalsa20Xor(ct, subKey, nonce8);
   }
 
   // ── crypto_box (xsalsa20-poly1305) ────────────────────────────────────────
@@ -83,18 +76,25 @@ class GitHubSeal {
     final block0 = _salsa20Block(subKey, nonce8, 0);
     final polyKey = block0.sublist(0, 32);
 
-    // Keystream from block 1 onward, XOR with message.
-    final out = Uint8List(msg.length);
-    var counter = 1;
-    for (var i = 0; i < msg.length; i += 64) {
-      final ks = _salsa20Block(subKey, nonce8, counter++);
-      final end = (i + 64 > msg.length) ? msg.length : i + 64;
-      for (var j = i; j < end; j++) {
-        out[j] = msg[j] ^ ks[j - i];
-      }
-    }
+    // Secretbox uses bytes 32..63 of block zero before moving to block one.
+    final out = _xsalsa20Xor(msg, subKey, nonce8);
     final tag = _poly1305(polyKey, out);
     return Uint8List.fromList([...tag, ...out]);
+  }
+
+  static Uint8List _xsalsa20Xor(Uint8List input, Uint8List key, Uint8List nonce8) {
+    final out = Uint8List(input.length);
+    var offset = 0;
+    var counter = 0;
+    var start = 32; // The first 32 bytes are reserved for the Poly1305 key.
+    while (offset < input.length) {
+      final block = _salsa20Block(key, nonce8, counter++);
+      for (var i = start; i < 64 && offset < input.length; i++, offset++) {
+        out[offset] = input[offset] ^ block[i];
+      }
+      start = 0;
+    }
+    return out;
   }
 
   // ── Salsa20 core ──────────────────────────────────────────────────────────
@@ -159,10 +159,10 @@ class GitHubSeal {
       input[1 + i] = _le32(key, i * 4);
       input[11 + i] = _le32(key, 16 + i * 4);
     }
-    input[6] = counter & 0xFFFFFFFF;
-    input[7] = (counter >> 32) & 0xFFFFFFFF;
-    input[8] = _le32(nonce8, 0);
-    input[9] = _le32(nonce8, 4);
+    input[6] = _le32(nonce8, 0);
+    input[7] = _le32(nonce8, 4);
+    input[8] = counter & 0xFFFFFFFF;
+    input[9] = (counter >> 32) & 0xFFFFFFFF;
 
     final r = _rounds(input);
     final out = ByteData(64);

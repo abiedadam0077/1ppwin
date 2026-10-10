@@ -1,6 +1,8 @@
 // Generated with PyNaCl / libsodium crypto_box_seal, not the Dart implementation.
 // This fixed private key is a public test fixture, never an application secret.
 const sodiumRecipientSeed = 'AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw=';
+const sodiumRecipientPublicKey = 'u1D/noKldM+/gg6X9g+5wUPsdBXPUU+M/Zjv9Z4FlhQ=';
+const sodiumEmptyMessageNonce = '04+LFqY37liIje9+c4wocB1Q35QMKGiB';
 const sodiumSealedVectors = <int, String>{
   0: 'iWUboLiDnAAQPTYNn11Po8W816IwMgqXUZ8/Iy0tQ3w/h+PthXSME7Aa9XQT5XWM',
   1: 'X7KVFMo+Z+8AOkQQlk89MW28YG+JROroCQJna4BpIGD9Or/K3SkVVIV2iwKyuR4Esg==',

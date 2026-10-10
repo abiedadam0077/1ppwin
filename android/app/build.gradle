@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "app.nova.windowscloud"
-    compileSdk = 34
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

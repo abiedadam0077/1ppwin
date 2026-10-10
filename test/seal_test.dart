@@ -8,6 +8,20 @@ import 'package:nova_windows_cloud/services/seal.dart';
 import 'fixtures/sodium_sealed_vectors.dart';
 
 void main() {
+  test('X25519 recipient public key matches libsodium', () async {
+    final pair = await X25519().newKeyPairFromSeed(base64Decode(sodiumRecipientSeed));
+    expect((await pair.extractPublicKey()).bytes, base64Decode(sodiumRecipientPublicKey));
+  });
+
+  test('24-byte Blake2b sealed-box nonce matches libsodium', () async {
+    final sealed = base64Decode(sodiumSealedVectors[0]!);
+    final digest = await Blake2b(hashLengthInBytes: 24).hash([
+      ...sealed.sublist(0, 32),
+      ...base64Decode(sodiumRecipientPublicKey),
+    ]);
+    expect(digest.bytes, base64Decode(sodiumEmptyMessageNonce));
+  });
+
   for (final entry in sodiumSealedVectors.entries) {
     test('opens libsodium sealed box (${entry.key} message bytes)', () async {
       final opened = await GitHubSeal.open(

@@ -1,6 +1,7 @@
 """Make CI diagnostics readable through the GitHub Checks API as well as logs."""
 
 import base64
+import gzip
 import os
 from pathlib import Path
 import re
@@ -46,6 +47,7 @@ elif status == "success":
 
 # Export the resolved lockfile only while it has not yet been committed. This
 # lets the maintainer recover exact dependency versions without a local SDK.
+# Compress it to stay below GitHub's per-step annotation count limit, too.
 lockfile = Path("pubspec.lock")
 if lockfile.exists():
     tracked = subprocess.run(
@@ -55,6 +57,6 @@ if lockfile.exists():
         check=False,
     ).returncode == 0
     if not tracked:
-        encoded = base64.b64encode(lockfile.read_bytes()).decode("ascii")
+        encoded = base64.b64encode(gzip.compress(lockfile.read_bytes(), mtime=0)).decode("ascii")
         for index, part in enumerate(chunks(encoded), 1):
-            annotate("notice", f"pubspec-lock-{index:03d}", part)
+            annotate("notice", f"pubspec-lock-gzip-{index:03d}", part)

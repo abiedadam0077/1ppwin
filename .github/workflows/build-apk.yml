@@ -59,7 +59,7 @@ jobs:
         id: dependencies
         run: |
           mkdir -p .ci
-          flutter pub get 2>&1 | tee .ci/pub-get.log
+          flutter pub get --enforce-lockfile 2>&1 | tee .ci/pub-get.log
 
       - name: Analyze & test
         run: |

@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, "arena/**"]
     paths:
       - "lib/**"
       - "android/**"
@@ -114,7 +114,7 @@ jobs:
           retention-days: 30
 
       - name: Publish direct-download release
-        if: ${{ success() && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') }}
+        if: ${{ success() }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest

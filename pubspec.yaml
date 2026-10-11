@@ -32,3 +32,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/windows11.yml
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Cairo-Bold.ttf
+          weight: 700

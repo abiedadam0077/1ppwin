@@ -44,6 +44,8 @@ Future<void> showPatSignInDialog(BuildContext context) async {
               controller: controller,
               label: 'ghp_... / github_pat_...',
               obscure: obscure,
+              textDirection: TextDirection.ltr,
+              keyboardType: TextInputType.visiblePassword,
               suffix: IconButton(
                 icon: Icon(obscure ? Icons.visibility : Icons.visibility_off, size: 18, color: NovaTheme.textDim),
                 onPressed: () => setModal(() => obscure = !obscure),
@@ -189,13 +191,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   child: Column(
                     children: [
-                      _feature(Icons.desktop_windows_rounded, 'Windows 11 Pro VM (KVM + Docker)'),
+                      _feature(Icons.desktop_windows_rounded, t.t('feature_vm')),
                       const Divider(color: NovaTheme.cardBorder, height: 18),
-                      _feature(Icons.enhanced_encryption_rounded, 'AES-256 Encrypted Backup & Restore'),
+                      _feature(Icons.enhanced_encryption_rounded, t.t('feature_backup')),
                       const Divider(color: NovaTheme.cardBorder, height: 18),
-                      _feature(Icons.lock_outline_rounded, 'Automatic GitHub Actions Secrets Setup'),
+                      _feature(Icons.lock_outline_rounded, t.t('feature_secrets')),
                       const Divider(color: NovaTheme.cardBorder, height: 18),
-                      _feature(Icons.public_rounded, 'Browser Web Viewer + Tailscale RDP'),
+                      _feature(Icons.public_rounded, t.t('feature_access')),
                     ],
                   ),
                 ),
@@ -560,7 +562,7 @@ class LoginSuccessScreen extends StatelessWidget {
                               style: const TextStyle(color: NovaTheme.text, fontSize: 15, fontWeight: FontWeight.w800),
                             ),
                             Text(
-                              '@$login • GitHub Connected',
+                              '@$login',
                               style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12),
                             ),
                           ],

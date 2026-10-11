@@ -28,28 +28,23 @@ class GlassCard extends StatelessWidget {
     final effectiveBorder = borderColor ?? NovaTheme.cardBorder;
     final effectiveGlow = glowColor ?? NovaTheme.neonBlue;
 
-    Widget content = Container(
+    Widget content = AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
       padding: padding ?? const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        gradient: LinearGradient(
-          colors: [
-            NovaTheme.card.withOpacity(0.92),
-            NovaTheme.bg2.withOpacity(0.86),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: NovaTheme.cardGradient,
         border: Border.all(
           color: effectiveBorder,
-          width: 1.2,
+          width: 1.1,
         ),
         boxShadow: [
           BoxShadow(
-            color: effectiveGlow.withOpacity(0.14),
-            blurRadius: 24,
+            color: effectiveGlow.withOpacity(0.12),
+            blurRadius: 20,
             spreadRadius: 0,
-            offset: const Offset(0, 6),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -70,7 +65,7 @@ class GlassCard extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: content,
       ),
     );
@@ -157,7 +152,7 @@ class GradientButton extends StatelessWidget {
     this.icon,
     this.busy = false,
     this.gradient,
-    this.height = 54,
+    this.height = 56,
   });
 
   @override
@@ -205,17 +200,19 @@ class GradientButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (ic != null) ...[
-                    Icon(ic, color: enabled ? Colors.white : NovaTheme.textMuted, size: 20),
-                    const SizedBox(width: 10),
+                    Icon(ic, color: enabled ? Colors.white : NovaTheme.textMuted, size: 18),
+                    const SizedBox(width: 8),
                   ],
                   Flexible(
                     child: Text(
                       label,
-                      maxLines: 1,
+                      maxLines: height >= 54 ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         color: enabled ? Colors.white : NovaTheme.textMuted,
-                        fontSize: 15,
+                        fontSize: 14,
+                        height: 1.04,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -271,11 +268,13 @@ class SecondaryNeonButton extends StatelessWidget {
                   Flexible(
                     child: Text(
                       label,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         color: color,
-                        fontSize: 13.5,
+                        fontSize: 12.5,
+                        height: 1.05,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -331,11 +330,12 @@ class QuickShortcutTile extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: NovaTheme.text,
-                    fontSize: 12.5,
+                    fontSize: 12,
+                    height: 1.08,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -367,6 +367,9 @@ class NeonField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final Widget? suffix;
   final IconData? prefixIcon;
+  final TextDirection? textDirection;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
 
   const NeonField({
     super.key,
@@ -377,6 +380,9 @@ class NeonField extends StatelessWidget {
     this.onChanged,
     this.suffix,
     this.prefixIcon,
+    this.textDirection,
+    this.keyboardType,
+    this.textInputAction,
   });
 
   @override
@@ -391,6 +397,10 @@ class NeonField extends StatelessWidget {
         controller: controller,
         obscureText: obscure,
         onChanged: onChanged,
+        textDirection: textDirection,
+        textAlign: TextAlign.start,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
         style: const TextStyle(color: NovaTheme.text, fontSize: 14),
         decoration: InputDecoration(
           labelText: label,
@@ -522,6 +532,315 @@ class GlowBackground extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Compact wordmark used in the dashboard and the launch screen.
+class NovaBrandLockup extends StatelessWidget {
+  final bool compact;
+  final double logoSize;
+
+  const NovaBrandLockup({super.key, this.compact = false, this.logoSize = 46});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        WindowsCloudLogo(size: logoSize),
+        SizedBox(width: compact ? 5 : 9),
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'NOVA',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: compact ? 15 : 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: compact ? 2.1 : 3.2,
+                  height: 1.05,
+                ),
+              ),
+              Text(
+                'Windows Cloud',
+                style: TextStyle(
+                  color: NovaTheme.neonCyan,
+                  fontSize: compact ? 9.5 : 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: compact ? 0.2 : 0.7,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class NovaNavigationItem {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+
+  const NovaNavigationItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+  });
+}
+
+/// Five-slot navigation bar sized specifically for compact Arabic layouts.
+class NovaBottomNavigationBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final List<NovaNavigationItem> items;
+
+  const NovaBottomNavigationBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xF20D1833), Color(0xFF070D20)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border(top: BorderSide(color: NovaTheme.cardBorder.withOpacity(0.85))),
+        boxShadow: [
+          BoxShadow(
+            color: NovaTheme.neonPurple.withOpacity(0.16),
+            blurRadius: 22,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 66,
+          child: Row(
+            children: [
+              for (var index = 0; index < items.length; index++)
+                Expanded(child: _item(items[index], index)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _item(NovaNavigationItem item, int index) {
+    final selected = selectedIndex == index;
+    final accent = NovaTheme.neonPurpleSoft;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item.label.replaceAll('\n', ' '),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(17),
+            onTap: () => onSelected(index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: selected
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          accent.withOpacity(0.22),
+                          NovaTheme.neonPurple.withOpacity(0.08),
+                        ],
+                      )
+                    : null,
+                border: Border.all(
+                  color: selected ? accent.withOpacity(0.5) : Colors.transparent,
+                ),
+                boxShadow: selected
+                    ? [BoxShadow(color: NovaTheme.neonPurple.withOpacity(0.16), blurRadius: 12)]
+                    : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 35,
+                    height: 25,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      color: selected ? accent.withOpacity(0.2) : Colors.transparent,
+                    ),
+                    child: Icon(
+                      selected ? item.selectedIcon : item.icon,
+                      size: selected ? 20 : 19,
+                      color: selected ? Colors.white : NovaTheme.textDim,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    item.label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: selected ? Colors.white : NovaTheme.textDim,
+                      fontSize: 9,
+                      height: 1.02,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NovaLoadingState extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const NovaLoadingState({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    this.icon = Icons.cloud_sync_rounded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: GlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 58,
+                height: 58,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.3,
+                        color: NovaTheme.neonBlue,
+                      ),
+                    ),
+                    Icon(icon, color: NovaTheme.neonCyan, size: 25),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: NovaTheme.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: NovaTheme.textDim,
+                  fontSize: 12,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NovaEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final Widget? action;
+
+  const NovaEmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.color = NovaTheme.neonCyan,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withOpacity(0.12),
+              border: Border.all(color: color.withOpacity(0.3)),
+            ),
+            child: Icon(icon, color: color, size: 27),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: NovaTheme.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.45),
+          ),
+          if (action != null) ...[
+            const SizedBox(height: 16),
+            action!,
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 /// Signature NOVA Windows Cloud emblem: Windows 11 4-pane logo inside a glowing cloud.

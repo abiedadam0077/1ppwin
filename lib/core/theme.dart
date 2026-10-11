@@ -1,57 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+/// Shared visual language for every NOVA screen.
+///
+/// Cairo is bundled locally so Arabic typography is available immediately on
+/// first launch and does not depend on a network font request.
 class NovaTheme {
-  static const Color bg = Color(0xFF050A1E);
-  static const Color bg2 = Color(0xFF081228);
-  static const Color bg3 = Color(0xFF0D1B3E);
-  static const Color card = Color(0xFF0A1430);
-  static const Color cardElevated = Color(0xFF101F46);
-  static const Color cardBorder = Color(0x552979FF);
-  static const Color cardBorderBright = Color(0xAA448AFF);
-  static const Color neonBlue = Color(0xFF2979FF);
-  static const Color neonPurple = Color(0xFF7C4DFF);
-  static const Color neonPurpleSoft = Color(0xFF9E7BFF);
-  static const Color neonCyan = Color(0xFF00E5FF);
-  static const Color ok = Color(0xFF00E676);
-  static const Color warn = Color(0xFFFFC107);
-  static const Color danger = Color(0xFFFF5252);
-  static const Color text = Color(0xFFEAF2FF);
-  static const Color textDim = Color(0xFFAAB8D8);
-  static const Color textMuted = Color(0xFF6E80A8);
+  static const Color bg = Color(0xFF05091B);
+  static const Color bg2 = Color(0xFF09152E);
+  static const Color bg3 = Color(0xFF102044);
+  static const Color card = Color(0xFF0B1630);
+  static const Color cardElevated = Color(0xFF12234A);
+  static const Color cardBorder = Color(0x553B78E8);
+  static const Color cardBorderBright = Color(0xAA4D8BFF);
+  static const Color neonBlue = Color(0xFF3478FF);
+  static const Color neonPurple = Color(0xFF8057FF);
+  static const Color neonPurpleSoft = Color(0xFFA48BFF);
+  static const Color neonCyan = Color(0xFF42D9FF);
+  static const Color ok = Color(0xFF36D99A);
+  static const Color warn = Color(0xFFFFC857);
+  static const Color danger = Color(0xFFFF667A);
+  static const Color text = Color(0xFFF1F5FF);
+  static const Color textDim = Color(0xFFB2C0DD);
+  static const Color textMuted = Color(0xFF7789AE);
 
-  static LinearGradient get btnGradient => const LinearGradient(
-        colors: [Color(0xFF2979FF), Color(0xFF7C4DFF)],
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-      );
+  static const String fontFamilyName = 'Cairo';
 
-  static LinearGradient get purpleGradient => const LinearGradient(
-        colors: [Color(0xFF7C4DFF), Color(0xFF536DFE)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+  static const LinearGradient btnGradient = LinearGradient(
+    colors: [Color(0xFF3183FF), Color(0xFF685BFF)],
+    begin: AlignmentDirectional.centerStart,
+    end: AlignmentDirectional.centerEnd,
+  );
 
-  static LinearGradient get cardGradient => LinearGradient(
-        colors: [
-          card.withOpacity(0.92),
-          bg2.withOpacity(0.86),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+  static const LinearGradient purpleGradient = LinearGradient(
+    colors: [Color(0xFF8A5CFF), Color(0xFF526BFF)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
-  static TextStyle fontFamily(TextStyle? s) =>
-      s == null ? GoogleFonts.cairo() : GoogleFonts.cairo(textStyle: s);
+  static const LinearGradient cardGradient = LinearGradient(
+    colors: [Color(0xF20D1A38), Color(0xE609142B)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static TextStyle fontFamily(TextStyle? style) =>
+      (style ?? const TextStyle()).copyWith(fontFamily: fontFamilyName);
 
   static ThemeData build() {
     final base = ThemeData.dark(useMaterial3: true);
-    final textTheme = GoogleFonts.cairoTextTheme(base.textTheme.apply(
+    final textTheme = base.textTheme.apply(
+      fontFamily: fontFamilyName,
       bodyColor: text,
       displayColor: text,
-    ));
+    );
+
     return base.copyWith(
+      fontFamily: fontFamilyName,
       scaffoldBackgroundColor: bg,
       colorScheme: const ColorScheme.dark(
         primary: neonBlue,
@@ -66,11 +71,20 @@ class NovaTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        iconTheme: const IconThemeData(color: text),
-        titleTextStyle: GoogleFonts.cairo(
+        toolbarHeight: 60,
+        titleSpacing: 12,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: bg,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        iconTheme: const IconThemeData(color: text, size: 22),
+        titleTextStyle: const TextStyle(
+          fontFamily: fontFamilyName,
           color: text,
-          fontSize: 18,
+          fontSize: 17,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -89,26 +103,25 @@ class NovaTheme {
           return const IconThemeData(color: textDim, size: 21);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return GoogleFonts.cairo(
-              color: Colors.white,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-            );
-          }
-          return GoogleFonts.cairo(
-            color: textDim,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+          return TextStyle(
+            fontFamily: fontFamilyName,
+            color: states.contains(WidgetState.selected) ? Colors.white : textDim,
+            fontSize: 10,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
           );
         }),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: cardElevated,
-        contentTextStyle: GoogleFonts.cairo(color: text, fontSize: 13, fontWeight: FontWeight.w600),
+        contentTextStyle: const TextStyle(
+          fontFamily: fontFamilyName,
+          color: text,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: cardBorder),
         ),
       ),
@@ -119,6 +132,38 @@ class NovaTheme {
           borderRadius: BorderRadius.circular(22),
           side: const BorderSide(color: cardBorder),
         ),
+        titleTextStyle: const TextStyle(
+          fontFamily: fontFamilyName,
+          color: text,
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+        ),
+        contentTextStyle: const TextStyle(
+          fontFamily: fontFamilyName,
+          color: textDim,
+          fontSize: 13,
+          height: 1.5,
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: cardBorder,
+        thickness: 1,
+        space: 1,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? Colors.white : textDim),
+        trackColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected)
+            ? neonPurple.withOpacity(0.62)
+            : cardElevated),
+        trackOutlineColor: WidgetStateProperty.all(cardBorder),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: neonBlue,
+        inactiveTrackColor: cardElevated,
+        thumbColor: Colors.white,
+        overlayColor: neonBlue.withOpacity(0.16),
+        valueIndicatorColor: neonPurple,
       ),
     );
   }

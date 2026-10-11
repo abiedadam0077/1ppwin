@@ -72,7 +72,7 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text(t.t('choose_repo')),
+          title: Text(t.t('repos')),
           actions: [
             IconButton(
               tooltip: t.t('refresh'),
@@ -88,6 +88,53 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
         ),
         body: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 5, 18, 7),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: NovaTheme.neonBlue.withOpacity(0.13),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: NovaTheme.neonBlue.withOpacity(0.32)),
+                    ),
+                    child: const Icon(Icons.folder_copy_outlined, color: NovaTheme.neonCyan, size: 21),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.t('choose_repo'),
+                          style: const TextStyle(
+                            color: NovaTheme.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          st.selectedRepo?.fullName ?? t.t('repo_pick_hint'),
+                          textDirection: st.selectedRepo != null ? TextDirection.ltr : null,
+                          textAlign: st.selectedRepo != null ? TextAlign.left : TextAlign.start,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5, height: 1.08),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  StatusBadge(
+                    label: '${st.repos.length}',
+                    color: NovaTheme.neonCyan,
+                    icon: Icons.folder_outlined,
+                  ),
+                ],
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 6, 18, 8),
               child: NeonField(
@@ -132,8 +179,12 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
               ),
             ),
             Expanded(
-              child: st.busy
-                  ? const Center(child: CircularProgressIndicator(color: NovaTheme.neonBlue))
+              child: st.busy && st.repos.isEmpty
+                  ? NovaLoadingState(
+                      title: t.t('loading_repos'),
+                      subtitle: t.t('loading_repos_sub'),
+                      icon: Icons.folder_copy_outlined,
+                    )
                   : st.reposError != null
                       ? _buildErrorState(t, st)
                       : list.isEmpty
@@ -188,31 +239,35 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
         ],
       );
 
-  Widget _buildEmptyState(L10n t, AppState st) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: GlassCard(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.folder_open_rounded, color: NovaTheme.neonCyan, size: 44),
-                const SizedBox(height: 12),
-                Text(
-                  t.t('no_repos_match'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: NovaTheme.text, fontSize: 14.5, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                GradientButton(
+  Widget _buildEmptyState(L10n t, AppState st) {
+    final hasNoRepos = st.repos.isEmpty;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: NovaEmptyState(
+          icon: hasNoRepos ? Icons.folder_open_rounded : Icons.search_off_rounded,
+          title: t.t(hasNoRepos ? 'repos_empty_title' : 'no_repos_match'),
+          subtitle: t.t(hasNoRepos ? 'repos_empty_sub' : 'no_repo_results_sub'),
+          color: hasNoRepos ? NovaTheme.neonCyan : NovaTheme.neonPurpleSoft,
+          action: hasNoRepos
+              ? GradientButton(
                   label: t.t('new_repo'),
                   icon: Icons.add,
                   onPressed: () => _createDialog(context, st),
+                )
+              : SecondaryNeonButton(
+                  label: t.t('clear_search_filter'),
+                  icon: Icons.filter_alt_off_rounded,
+                  onPressed: () => setState(() {
+                    _searchCtrl.clear();
+                    _q = '';
+                    _filter = 'all';
+                  }),
                 ),
-              ],
-            ),
-          ),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _buildRepoCard(BuildContext context, AppState st, L10n t, Repo r) {
     final selected = st.selectedRepo?.fullName == r.fullName;
@@ -295,6 +350,8 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                         Flexible(
                           child: Text(
                             r.name,
+                            textDirection: TextDirection.ltr,
+                            textAlign: TextAlign.left,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -317,6 +374,8 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                     const SizedBox(height: 2),
                     Text(
                       r.description?.trim().isNotEmpty == true ? r.description! : r.fullName,
+                      textDirection: r.description?.trim().isNotEmpty == true ? null : TextDirection.ltr,
+                      textAlign: r.description?.trim().isNotEmpty == true ? TextAlign.start : TextAlign.left,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
@@ -465,6 +524,9 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
               NeonField(
                 label: t.t('repo_name'),
                 controller: name,
+                textDirection: TextDirection.ltr,
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.done,
                 prefixIcon: Icons.folder_outlined,
               ),
               const SizedBox(height: 12),

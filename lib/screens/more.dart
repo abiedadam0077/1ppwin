@@ -76,29 +76,45 @@ class _ActivityScreenState extends State<ActivityScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
                 children: [
                   for (final f in [
                     ['all', t.t('all')],
                     ['ok', t.t('filter_success')],
                     ['fail', t.t('filter_failed')],
                   ])
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ChoiceChip(
-                        label: Text(f[1], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                        selected: _filter == f[0],
-                        selectedColor: NovaTheme.neonPurple,
-                        backgroundColor: NovaTheme.card,
-                        side: BorderSide(
-                          color: _filter == f[0] ? NovaTheme.neonPurpleSoft : NovaTheme.cardBorder,
-                        ),
-                        labelStyle: TextStyle(
-                          color: _filter == f[0] ? Colors.white : NovaTheme.textDim,
-                        ),
-                        onSelected: (_) => setState(() => _filter = f[0]),
+                    ChoiceChip(
+                      label: Text(f[1], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      selected: _filter == f[0],
+                      selectedColor: NovaTheme.neonPurple,
+                      backgroundColor: NovaTheme.card,
+                      side: BorderSide(
+                        color: _filter == f[0] ? NovaTheme.neonPurpleSoft : NovaTheme.cardBorder,
                       ),
+                      labelStyle: TextStyle(
+                        color: _filter == f[0] ? Colors.white : NovaTheme.textDim,
+                      ),
+                      onSelected: (_) => setState(() => _filter = f[0]),
                     ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 1, 20, 7),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      t.t('activity_sub'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5, height: 1.3),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  StatusBadge(label: '${items.length}', color: NovaTheme.neonCyan, icon: Icons.receipt_long_outlined),
                 ],
               ),
             ),
@@ -107,28 +123,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
-                        child: GlassCard(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.history_toggle_off_rounded, color: NovaTheme.neonCyan, size: 46),
-                              const SizedBox(height: 12),
-                              Text(
-                                t.t('activity_empty'),
-                                style: const TextStyle(
-                                  color: NovaTheme.text,
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                t.t('activity_empty_sub'),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.4),
-                              ),
-                            ],
-                          ),
+                        child: NovaEmptyState(
+                          icon: Icons.history_toggle_off_rounded,
+                          title: t.t('activity_empty'),
+                          subtitle: t.t('activity_empty_sub'),
+                          color: NovaTheme.neonCyan,
                         ),
                       ),
                     )
@@ -170,17 +169,26 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                     ),
                                     if (e.detail.isNotEmpty) ...[
                                       const SizedBox(height: 2),
-                                      Text(
-                                        e.detail,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12),
+                                      Directionality(
+                                        textDirection: TextDirection.ltr,
+                                        child: Text(
+                                          e.detail,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.left,
+                                          style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12),
+                                        ),
                                       ),
                                     ],
                                     const SizedBox(height: 3),
-                                    Text(
-                                      _fmtTime(e.time),
-                                      style: const TextStyle(color: NovaTheme.textDim, fontSize: 11),
+                                    Directionality(
+                                      textDirection: TextDirection.ltr,
+                                      child: Text(
+                                        _fmtTime(e.time),
+                                        maxLines: 1,
+                                        textAlign: TextAlign.start,
+                                        style: const TextStyle(color: NovaTheme.textDim, fontSize: 11),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -214,6 +222,9 @@ class SettingsScreen extends StatelessWidget {
     final login = st.user?['login'] as String? ?? '';
     final name = st.user?['name'] as String? ?? login;
     final avatar = st.user?['avatar_url'] as String?;
+    final forwardIcon = Directionality.of(context) == TextDirection.rtl
+        ? Icons.arrow_back_ios_rounded
+        : Icons.arrow_forward_ios_rounded;
 
     return GlowBackground(
       child: Scaffold(
@@ -310,6 +321,55 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
 
+            // Current repository is visible at a glance and opens the picker.
+            GlassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              borderColor: st.selectedRepo == null ? NovaTheme.cardBorder : NovaTheme.neonPurple.withOpacity(0.5),
+              glowColor: NovaTheme.neonPurple,
+              onTap: () => st.setTab(1),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: NovaTheme.neonPurple.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.folder_special_rounded, color: NovaTheme.neonPurpleSoft, size: 21),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.t('settings_current_repo'),
+                          style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          st.selectedRepo?.fullName ?? t.t('no_current_repo'),
+                          textDirection: st.selectedRepo != null ? TextDirection.ltr : null,
+                          textAlign: st.selectedRepo != null ? TextAlign.left : TextAlign.start,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: NovaTheme.text,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(forwardIcon, color: NovaTheme.neonCyan, size: 15),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
             // Management & Configuration Links
             GlassCard(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -321,7 +381,7 @@ class SettingsScreen extends StatelessWidget {
                       t.t('security'),
                       style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
+                    trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
                     onTap: () => Navigator.pushNamed(context, '/security'),
                   ),
                   const Divider(color: NovaTheme.cardBorder, height: 1),
@@ -331,7 +391,7 @@ class SettingsScreen extends StatelessWidget {
                       t.t('choose_repo'),
                       style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
+                    trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
                     onTap: () => Navigator.pushNamed(context, '/repos'),
                   ),
                   if (st.selectedRepo != null) ...[
@@ -342,7 +402,7 @@ class SettingsScreen extends StatelessWidget {
                         t.t('setup_repo_title'),
                         style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                       ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
+                      trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const RepoSetupScreen()),
                       ),
@@ -355,7 +415,7 @@ class SettingsScreen extends StatelessWidget {
                       t.t('use_pat_instead'),
                       style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
+                    trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
                     onTap: () => showPatSignInDialog(context),
                   ),
                 ],

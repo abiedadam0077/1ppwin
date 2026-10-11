@@ -224,7 +224,11 @@ class _BackupsScreenState extends State<BackupsScreen> {
     }
 
     if (st.backupsBusy && st.backupsList == null) {
-      return const Center(child: CircularProgressIndicator(color: NovaTheme.neonBlue));
+      return NovaLoadingState(
+        title: t.t('loading_backups'),
+        subtitle: t.t('available'),
+        icon: Icons.backup_rounded,
+      );
     }
 
     final backups = st.backupsList ?? const <BackupInfo>[];
@@ -242,9 +246,13 @@ class _BackupsScreenState extends State<BackupsScreen> {
               const Icon(Icons.inventory_2_outlined, color: NovaTheme.neonCyan, size: 17),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  st.selectedRepo!.fullName,
-                  style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 13, fontWeight: FontWeight.w700),
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(
+                    st.selectedRepo!.fullName,
+                    textAlign: TextAlign.left,
+                    style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
               if (st.backupsBusy)
@@ -353,32 +361,18 @@ class _BackupsScreenState extends State<BackupsScreen> {
 
           // State 5: No backups exist yet in this repository
           if (backups.isEmpty)
-            GlassCard(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                children: [
-                  const Icon(Icons.backup_table_rounded, color: NovaTheme.textDim, size: 42),
-                  const SizedBox(height: 10),
-                  Text(
-                    t.t('no_backups'),
-                    style: const TextStyle(color: NovaTheme.text, fontSize: 15, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    t.t('no_backups_sub'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.45),
-                  ),
-                  const SizedBox(height: 16),
-                  SecondaryNeonButton(
-                    label: t.t('start_windows'),
-                    icon: Icons.rocket_launch_rounded,
-                    color: NovaTheme.neonCyan,
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SessionSetupScreen()),
-                    ),
-                  ),
-                ],
+            NovaEmptyState(
+              icon: Icons.backup_table_rounded,
+              title: t.t('no_backups'),
+              subtitle: t.t('no_backups_sub'),
+              color: NovaTheme.neonCyan,
+              action: SecondaryNeonButton(
+                label: t.t('start_windows'),
+                icon: Icons.rocket_launch_rounded,
+                color: NovaTheme.neonCyan,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SessionSetupScreen()),
+                ),
               ),
             ),
 

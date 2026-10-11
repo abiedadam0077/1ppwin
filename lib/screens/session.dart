@@ -199,12 +199,13 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _sumRow(t.t('repo'), st.selectedRepo?.fullName ?? '—'),
+                    _sumRow(t.t('repo'), st.selectedRepo?.fullName ?? '—', ltr: st.selectedRepo != null),
                     _sumRow(t.t('duration'), '$h ${t.t('hours')} (${h * 60} ${t.t('minutes')})'),
                     _sumRow(t.t('type'), _fresh ? t.t('fresh_install') : t.t('restore_session')),
                     _sumRow(
                       t.t('last_backup_card'),
                       latestBackup != null ? latestBackup.tag : t.t('no_backups'),
+                      ltr: latestBackup != null,
                     ),
                   ],
                 ),
@@ -244,7 +245,7 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
     );
   }
 
-  Widget _sumRow(String k, String v) => Padding(
+  Widget _sumRow(String k, String v, {bool ltr = false}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
@@ -255,6 +256,8 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
             Expanded(
               child: Text(
                 v,
+                textDirection: ltr ? TextDirection.ltr : null,
+                textAlign: ltr ? TextAlign.left : TextAlign.start,
                 style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w700),
               ),
             ),
@@ -383,6 +386,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return null;
   }
 
+  int get _completedStepCount => _steps.where((step) => step.status == 'completed').length;
+
+  double? get _stepProgress =>
+      _steps.isEmpty ? null : (_completedStepCount / _steps.length).clamp(0.0, 1.0).toDouble();
+
   void _goReady() {
     if (!mounted) return;
     final nav = Navigator.of(context);
@@ -442,13 +450,90 @@ class _ProgressScreenState extends State<ProgressScreen> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: NovaTheme.danger, fontSize: 12),
+                child: GlassCard(
+                  borderColor: NovaTheme.danger.withOpacity(0.55),
+                  glowColor: NovaTheme.danger,
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off_rounded, color: NovaTheme.danger, size: 19),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: NovaTheme.text, fontSize: 12, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
+            GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: NovaTheme.neonBlue.withOpacity(0.14),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Icon(Icons.timeline_rounded, color: NovaTheme.neonCyan, size: 19),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          t.t('workflow_progress'),
+                          style: const TextStyle(
+                            color: NovaTheme.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (_steps.isNotEmpty)
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Text(
+                            '$_completedStepCount / ${_steps.length}',
+                            style: const TextStyle(
+                              color: NovaTheme.neonCyan,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: _stepProgress,
+                      minHeight: 7,
+                      backgroundColor: NovaTheme.bg3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _isRunFailed ? NovaTheme.danger : NovaTheme.neonBlue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    _steps.isEmpty
+                        ? t.t(status == 'queued' || status == 'waiting' ? 'session_queued' : 'monitor_sub')
+                        : t.t('steps_complete'),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
 
             if (_isRunFailed) ...[
               GlassCard(
@@ -476,7 +561,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     if (_failedStepName != null) ...[
                       const SizedBox(height: 6),
                       Text(
-                        'Step: $_failedStepName',
+                        '${t.t('failed_step')} $_failedStepName',
                         style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w700),
                       ),
                     ],
@@ -744,32 +829,43 @@ class _ReadyScreenState extends State<ReadyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.lan_outlined, color: NovaTheme.neonCyan, size: 19),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          t.t('conn_info'),
-                          style: const TextStyle(
-                            color: NovaTheme.neonCyan,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
+                      Row(
+                        children: [
+                          const Icon(Icons.lan_outlined, color: NovaTheme.neonCyan, size: 19),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              t.t('conn_info'),
+                              style: const TextStyle(
+                                color: NovaTheme.neonCyan,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (st.runStartedAt != null) ...[
+                        const SizedBox(height: 9),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: StatusBadge(
+                            label: '${t.t('time_left')}: ${_remaining(st)}',
+                            color: NovaTheme.neonBlue,
+                            icon: Icons.timer_outlined,
                           ),
                         ),
-                      ),
-                      if (st.runStartedAt != null)
-                        StatusBadge(
-                          label: '${t.t('time_left')}: ${_remaining(st)}',
-                          color: NovaTheme.neonBlue,
-                          icon: Icons.timer_outlined,
-                        ),
+                      ],
                     ],
                   ),
                   const Divider(color: NovaTheme.cardBorder, height: 22),
                   _row(
                     t.t('user'),
                     info?.winUser ?? 'Docker',
+                    ltr: true,
                     trailing: IconButton(
                       icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
                       onPressed: () {
@@ -785,6 +881,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                     hasInMemoryPass
                         ? (_showPass ? st.inMemoryAccessPassword! : '••••••••••••')
                         : t.t('password_in_secrets'),
+                    ltr: hasInMemoryPass,
                     trailing: hasInMemoryPass
                         ? Row(
                             mainAxisSize: MainAxisSize.min,
@@ -811,6 +908,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                     _row(
                       t.t('ip'),
                       tsIp,
+                      ltr: true,
                       trailing: IconButton(
                         icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
                         onPressed: () {
@@ -824,6 +922,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                   _row(
                     t.t('web_link'),
                     hasWebUrl ? webUrl : t.t('waiting_web_link'),
+                    ltr: hasWebUrl,
                     trailing: hasWebUrl
                         ? IconButton(
                             icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
@@ -963,7 +1062,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
     return '${d.inHours}h ${d.inMinutes % 60}m';
   }
 
-  Widget _row(String k, String v, {Widget? trailing}) => Padding(
+  Widget _row(String k, String v, {bool ltr = false, Widget? trailing}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
@@ -974,7 +1073,10 @@ class _ReadyScreenState extends State<ReadyScreen> {
             Expanded(
               child: SelectableText(
                 v,
+                textDirection: ltr ? TextDirection.ltr : null,
+                textAlign: ltr ? TextAlign.left : TextAlign.start,
                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: NovaTheme.text,
                   fontSize: 13,

@@ -26,57 +26,42 @@ class HomeShell extends StatelessWidget {
       ActivityScreen(),
       SettingsScreen(),
     ];
-    final idx = st.currentTab.clamp(0, screens.length - 1);
+    final idx = st.currentTab.clamp(0, screens.length - 1).toInt();
+    final destinations = [
+      NovaNavigationItem(
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home_rounded,
+        label: t.t('home'),
+      ),
+      NovaNavigationItem(
+        icon: Icons.folder_outlined,
+        selectedIcon: Icons.folder_rounded,
+        label: t.t('nav_repos'),
+      ),
+      NovaNavigationItem(
+        icon: Icons.backup_outlined,
+        selectedIcon: Icons.backup_rounded,
+        label: t.t('nav_backups'),
+      ),
+      NovaNavigationItem(
+        icon: Icons.history_outlined,
+        selectedIcon: Icons.history_rounded,
+        label: t.t('nav_activity'),
+      ),
+      NovaNavigationItem(
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings_rounded,
+        label: t.t('nav_settings'),
+      ),
+    ];
 
     return Scaffold(
       backgroundColor: NovaTheme.bg,
-      body: screens[idx],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: NovaTheme.card.withOpacity(0.96),
-          border: const Border(top: BorderSide(color: NovaTheme.cardBorder, width: 1.2)),
-          boxShadow: [
-            BoxShadow(
-              color: NovaTheme.neonPurple.withOpacity(0.18),
-              blurRadius: 22,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: NavigationBar(
-          height: 68,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedIndex: idx,
-          onDestinationSelected: (i) => st.setTab(i),
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(Icons.dashboard_outlined),
-              selectedIcon: const Icon(Icons.dashboard_rounded),
-              label: t.t('home'),
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.folder_outlined),
-              selectedIcon: const Icon(Icons.folder_rounded),
-              label: t.t('repos'),
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.backup_outlined),
-              selectedIcon: const Icon(Icons.backup_rounded),
-              label: t.t('backups'),
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.history_outlined),
-              selectedIcon: const Icon(Icons.history_rounded),
-              label: t.t('activity'),
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.settings_outlined),
-              selectedIcon: const Icon(Icons.settings_rounded),
-              label: t.t('settings'),
-            ),
-          ],
-        ),
+      body: IndexedStack(index: idx, children: screens),
+      bottomNavigationBar: NovaBottomNavigationBar(
+        selectedIndex: idx,
+        items: destinations,
+        onSelected: st.setTab,
       ),
     );
   }
@@ -192,66 +177,17 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_queue_rounded, color: NovaTheme.neonCyan, size: 22),
-              const SizedBox(width: 8),
-              const Text(
-                'NOVA',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.5,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'Cloud',
-                style: TextStyle(
-                  color: NovaTheme.neonCyan,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
+          title: const NovaBrandLockup(compact: true, logoSize: 43),
           actions: [
             if (login.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: () => st.setTab(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: NovaTheme.card,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: NovaTheme.cardBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircleAvatar(
-                          radius: 11,
-                          backgroundColor: NovaTheme.bg2,
-                          backgroundImage: avatar != null ? NetworkImage(avatar) : null,
-                          child: avatar == null ? const Icon(Icons.person, size: 13) : null,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          login,
-                          style: const TextStyle(
-                            color: NovaTheme.text,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              IconButton(
+                tooltip: login,
+                onPressed: () => st.setTab(4),
+                icon: CircleAvatar(
+                  radius: 13,
+                  backgroundColor: NovaTheme.bg2,
+                  backgroundImage: avatar != null ? NetworkImage(avatar) : null,
+                  child: avatar == null ? const Icon(Icons.person, size: 15, color: NovaTheme.textDim) : null,
                 ),
               ),
             IconButton(
@@ -330,6 +266,10 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
       stateColor = NovaTheme.neonCyan;
       stateLabel = t.t('win_state_starting');
       stateIcon = Icons.sync;
+    } else if (st.statusBusy && st.selectedRepo != null) {
+      stateColor = NovaTheme.neonBlue;
+      stateLabel = t.t('checking');
+      stateIcon = Icons.sync_rounded;
     } else if (isReadyToStart) {
       stateColor = NovaTheme.neonCyan;
       stateLabel = t.t('win_state_ready');
@@ -380,7 +320,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                 label: stateLabel,
                 color: stateColor,
                 icon: stateIcon,
-                pulsing: isLive && !hasSessionInfo,
+                pulsing: (isLive && !hasSessionInfo) || (st.statusBusy && st.selectedRepo != null),
               ),
             ],
           ),
@@ -401,9 +341,13 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 3),
               child: Center(
-                child: Text(
-                  st.selectedRepo!.fullName,
-                  style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12.5, fontWeight: FontWeight.w600),
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(
+                    st.selectedRepo!.fullName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ),
@@ -560,12 +504,16 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        repo.fullName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(
+                          repo.fullName,
+                          textAlign: TextAlign.left,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 2),

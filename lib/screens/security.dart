@@ -330,6 +330,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
                             hint: st.hasAccessSecret ? t.t('keep_existing_hint') : t.t('required_secret_hint'),
                             controller: _access,
                             obscure: !_showA,
+                            textDirection: TextDirection.ltr,
+                            keyboardType: TextInputType.visiblePassword,
                             prefixIcon: Icons.lock_person_outlined,
                             onChanged: (_) => setState(() {}),
                             suffix: IconButton(
@@ -344,6 +346,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
                             hint: st.hasBackupSecret ? t.t('keep_existing_hint') : t.t('required_secret_hint'),
                             controller: _backup,
                             obscure: !_showB,
+                            textDirection: TextDirection.ltr,
+                            keyboardType: TextInputType.visiblePassword,
                             prefixIcon: Icons.enhanced_encryption_outlined,
                             onChanged: (_) => setState(() {}),
                             suffix: IconButton(
@@ -358,6 +362,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
                             hint: 'tskey-auth-...',
                             controller: _ts,
                             obscure: !_showTs,
+                            textDirection: TextDirection.ltr,
+                            keyboardType: TextInputType.visiblePassword,
                             prefixIcon: Icons.router_outlined,
                             onChanged: (_) => setState(() {}),
                             suffix: IconButton(
@@ -459,12 +465,16 @@ class _SecurityScreenState extends State<SecurityScreen> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            name,
-            style: const TextStyle(
-              color: NovaTheme.text,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Text(
+              name,
+              textAlign: TextAlign.left,
+              style: const TextStyle(
+                color: NovaTheme.text,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),

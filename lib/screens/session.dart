@@ -1139,12 +1139,12 @@ class _ReadyScreenState extends State<ReadyScreen> {
                   if (hasTsIp)
                     _row(
                       t.t('ip'),
-                      tsIp!,
+                      tsIp,
                       ltr: true,
                       trailing: IconButton(
                         icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: tsIp!));
+                          Clipboard.setData(ClipboardData(text: tsIp));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(t.t('rdp_copied'))),
                           );
@@ -1161,7 +1161,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                     !st.webAccessEnabled
                         ? t.t('access_disabled')
                         : hasWebUrl
-                            ? webUrl!
+                            ? webUrl
                             : t.t('waiting_web_link'),
                     ltr: st.webAccessEnabled && hasWebUrl,
                     trailing: !st.webAccessEnabled
@@ -1170,7 +1170,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                             ? IconButton(
                                 icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
                                 onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: webUrl!));
+                                  Clipboard.setData(ClipboardData(text: webUrl));
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text(t.t('code_copied'))),
                                   );
@@ -1188,7 +1188,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                       label: t.t('open_windows'),
                       icon: Icons.open_in_new_rounded,
                       onPressed: () => launchUrl(
-                        Uri.parse(webUrl!),
+                        Uri.parse(webUrl),
                         mode: LaunchMode.externalApplication,
                       ),
                     ),

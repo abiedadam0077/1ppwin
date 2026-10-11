@@ -1092,7 +1092,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: value),
-                      if (trailing != null) trailing!,
+                      if (trailing != null) trailing,
                     ],
                   ),
                 ],
@@ -1106,7 +1106,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
               children: [
                 SizedBox(width: 110, child: label),
                 Expanded(child: value),
-                if (trailing != null) trailing!,
+                if (trailing != null) trailing,
               ],
             ),
           );

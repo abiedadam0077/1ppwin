@@ -35,18 +35,27 @@ class _NovaAppState extends State<NovaApp> {
   @override
   void initState() {
     super.initState();
-    _linkSub = AppLinks().uriLinkStream.listen((uri) async {
-      if (uri.scheme != 'novawindowscloud') return;
-      final st = context.read<AppState>();
-      final err = await st.handleCallback(uri);
-      if (mounted) {
-        if (err != null) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-        } else {
-          st.setJustLoggedIn(true);
-        }
-      }
-    });
+    _linkSub = AppLinks().uriLinkStream.listen(_handleLink, onError: (_) {});
+    // The stream already replays cold-start links on Android; asking for the
+    // initial link as well costs nothing and covers platform differences.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _handleInitialLink());
+  }
+
+  Future<void> _handleInitialLink() async {
+    try {
+      final uri = await AppLinks().getInitialLink();
+      if (uri != null) await _handleLink(uri);
+    } catch (_) {
+      // ignored: the stream is the primary source
+    }
+  }
+
+  Future<void> _handleLink(Uri uri) async {
+    if (!mounted || uri.scheme != 'novawindowscloud') return;
+    final state = context.read<AppState>();
+    final error = await state.handleCallback(uri);
+    if (!mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
 
   @override

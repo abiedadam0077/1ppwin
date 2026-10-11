@@ -34,6 +34,31 @@ https://github.com/abiedadam0077/1ppwin/releases/download/apk-latest/NOVA-Window
 Verify a **successful main run** (not only a PR run) and the release asset
 before sharing that URL. PR runs deliberately do not publish releases.
 
+## Sign-in
+
+Sign-in never completed before; two independent causes were found and fixed:
+
+- The token exchange posted `jsonEncode(...)` through `http.post` without a JSON
+  content type, so the request went out as `text/plain` and GitHub answered
+  **HTTP 404** `{"error":"Not Found"}`. The exchange now sends a form-encoded
+  body (`Map<String, String>`). Verified against github.com: form bodies are
+  parsed (HTTP 200), `text/plain` JSON bodies 404.
+- GitHub **requires the app client secret** to redeem a web-flow code for a
+  GitHub App — PKCE is additive, not a replacement — so the browser flow can
+  never complete from an APK that embeds no secret.
+
+The app therefore signs in with the **OAuth device flow** (RFC 8628) by
+default: no secret, no redirect URI, no deep link. Device flow is confirmed
+enabled for client ID `Iv23liceWNo2k0jhvUo6` (`POST /login/device/code`
+returns a real `user_code`). `offline_access` is requested so GitHub returns an
+8 h access token plus a rotating 6-month refresh token, and device-flow refresh
+tokens need no client secret, so the app renews silently on 401.
+
+The web flow is kept as an advanced fallback for users who paste their app
+client secret (stored only in the Android keystore). The PKCE verifier is now
+persisted before the browser opens, so a callback that cold-starts the app
+still completes, and the callback URL/code can also be pasted manually.
+
 ## App configuration
 
 The public GitHub App client ID is in `lib/core/const.dart` and the callback

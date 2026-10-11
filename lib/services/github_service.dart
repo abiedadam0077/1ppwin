@@ -61,8 +61,13 @@ class SessionInfo {
 }
 
 class GitHubService {
-  final String token;
-  GitHubService(this.token);
+  String token;
+
+  /// Called once when the API answers 401 (expired token). Returning a fresh
+  /// access token retries the request; returning null gives up.
+  final Future<String?> Function()? onUnauthorized;
+
+  GitHubService(this.token, {this.onUnauthorized});
 
   Map<String, String> get _h => {
         'Authorization': 'Bearer $token',
@@ -71,25 +76,38 @@ class GitHubService {
         'User-Agent': 'NOVA-Windows-Cloud',
       };
 
-  Future<dynamic> _send(String method, String path, {Object? body}) async {
-    final uri = Uri.parse('${Const.apiBase}$path');
-    http.Response res;
+  Future<http.Response> _attempt(String method, Uri uri, Object? body) async {
     switch (method) {
       case 'GET':
-        res = await http.get(uri, headers: _h);
-        break;
+        return http.get(uri, headers: _h);
       case 'POST':
-        res = await http.post(uri, headers: {..._h, 'Content-Type': 'application/json'}, body: body == null ? null : jsonEncode(body));
-        break;
+        return http.post(uri, headers: {..._h, 'Content-Type': 'application/json'}, body: body == null ? null : jsonEncode(body));
       case 'PUT':
-        res = await http.put(uri, headers: {..._h, 'Content-Type': 'application/json'}, body: body == null ? null : jsonEncode(body));
-        break;
+        return http.put(uri, headers: {..._h, 'Content-Type': 'application/json'}, body: body == null ? null : jsonEncode(body));
       case 'DELETE':
-        res = await http.delete(uri, headers: _h);
-        break;
+        return http.delete(uri, headers: _h);
       default:
         throw GhException(0, 'bad method');
     }
+  }
+
+  Future<dynamic> _send(String method, String path, {Object? body}) async {
+    final uri = Uri.parse('${Const.apiBase}$path');
+    var res = await _attempt(method, uri, body);
+
+    if (res.statusCode == 401 && onUnauthorized != null) {
+      String? fresh;
+      try {
+        fresh = await onUnauthorized!();
+      } catch (_) {
+        fresh = null;
+      }
+      if (fresh != null && fresh.isNotEmpty) {
+        token = fresh;
+        res = await _attempt(method, uri, body);
+      }
+    }
+
     if (res.statusCode >= 400) {
       throw GhException(res.statusCode, res.body);
     }

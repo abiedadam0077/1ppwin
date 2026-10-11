@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 import 'package:provider/provider.dart';
 import 'package:nova_windows_cloud/screens/home_shell.dart';
 import 'package:nova_windows_cloud/state/app_state.dart';

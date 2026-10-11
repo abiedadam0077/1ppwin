@@ -55,30 +55,20 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.timer_outlined, color: NovaTheme.neonCyan, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              t.t('duration'),
-                              style: const TextStyle(
-                                color: NovaTheme.text,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                        StatusBadge(
-                          label: '$h ${t.t('hours')} (${h * 60} ${t.t('minutes')})',
-                          color: NovaTheme.neonCyan,
-                          icon: Icons.schedule,
+                        const Icon(Icons.timer_outlined, color: NovaTheme.neonCyan, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          t.t('duration'),
+                          style: const TextStyle(
+                            color: NovaTheme.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Slider.adaptive(
                       value: _hours,
                       min: 1,
@@ -87,33 +77,28 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                       activeColor: NovaTheme.neonBlue,
                       onChanged: (v) => setState(() => _hours = v),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        for (var i = 1; i <= Const.maxSessionHours; i++)
-                          InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            onTap: () => setState(() => _hours = i.toDouble()),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: h == i ? NovaTheme.neonPurple : NovaTheme.bg2,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: h == i ? NovaTheme.neonPurpleSoft : NovaTheme.cardBorder,
-                                ),
-                              ),
-                              child: Text(
-                                '${i}h',
-                                style: TextStyle(
-                                  color: h == i ? Colors.white : NovaTheme.textDim,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('1h', style: TextStyle(color: NovaTheme.textDim, fontSize: 11.5)),
+                          Text(
+                            '${Const.maxSessionHours}h',
+                            style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
                           ),
-                      ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '$h ${t.t('hours')}  ·  ${h * 60} ${t.t('minutes')}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: NovaTheme.neonCyan,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const Divider(color: NovaTheme.cardBorder, height: 24),
                     NeonSwitch(
@@ -423,28 +408,105 @@ class _ProgressScreenState extends State<ProgressScreen> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const Center(child: WindowsCloudLogo(size: 130)),
-            const SizedBox(height: 8),
             Center(
-              child: StatusBadge(
-                label: _isRunFailed
-                    ? '${t.t('run_failed_title')} (${conclusion ?? ''})'
-                    : _isRunning
-                        ? t.t('windows_running')
-                        : status == 'queued'
-                            ? t.t('session_queued')
-                            : t.t('monitor_sub'),
-                color: _isRunFailed
-                    ? NovaTheme.danger
-                    : _isRunning
-                        ? NovaTheme.ok
-                        : NovaTheme.neonCyan,
-                pulsing: !_isRunFailed && !_isRunning,
-                icon: _isRunFailed
-                    ? Icons.error_outline
-                    : _isRunning
-                        ? Icons.check_circle
-                        : null,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 174,
+                    height: 174,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 128,
+                          height: 128,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [NovaTheme.neonBlue.withOpacity(0.18), NovaTheme.bg.withOpacity(0.02)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (_isRunFailed ? NovaTheme.danger : NovaTheme.neonBlue).withOpacity(0.20),
+                                blurRadius: 34,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 164,
+                          height: 164,
+                          child: CircularProgressIndicator(
+                            value: _stepProgress,
+                            strokeWidth: 8,
+                            backgroundColor: NovaTheme.cardElevated.withOpacity(0.78),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _isRunFailed ? NovaTheme.danger : NovaTheme.neonCyan,
+                            ),
+                          ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const WindowsMark(size: 34),
+                            const SizedBox(height: 7),
+                            Text(
+                              _steps.isEmpty ? '—' : '${((_stepProgress ?? 0) * 100).round()}%',
+                              style: const TextStyle(
+                                color: NovaTheme.text,
+                                fontSize: 23,
+                                height: 1,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            if (_steps.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: Text(
+                                  '$_completedStepCount / ${_steps.length}',
+                                  style: const TextStyle(
+                                    color: NovaTheme.textDim,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    t.t('workflow_progress'),
+                    style: const TextStyle(color: NovaTheme.text, fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  StatusBadge(
+                    label: _isRunFailed
+                        ? '${t.t('run_failed_title')} (${conclusion ?? ''})'
+                        : _isRunning
+                            ? t.t('windows_running')
+                            : status == 'queued' || status == 'waiting'
+                                ? t.t('session_queued')
+                                : t.t('monitor_sub'),
+                    color: _isRunFailed
+                        ? NovaTheme.danger
+                        : _isRunning
+                            ? NovaTheme.ok
+                            : NovaTheme.neonCyan,
+                    pulsing: !_isRunFailed && !_isRunning,
+                    icon: _isRunFailed
+                        ? Icons.error_outline
+                        : _isRunning
+                            ? Icons.check_circle
+                            : null,
+                  ),
+                ],
               ),
             ),
             if (_error != null)
@@ -468,71 +530,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ),
                 ),
               ),
-            const SizedBox(height: 14),
-            GlassCard(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: NovaTheme.neonBlue.withOpacity(0.14),
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: const Icon(Icons.timeline_rounded, color: NovaTheme.neonCyan, size: 19),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          t.t('workflow_progress'),
-                          style: const TextStyle(
-                            color: NovaTheme.text,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      if (_steps.isNotEmpty)
-                        Directionality(
-                          textDirection: TextDirection.ltr,
-                          child: Text(
-                            '$_completedStepCount / ${_steps.length}',
-                            style: const TextStyle(
-                              color: NovaTheme.neonCyan,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: _stepProgress,
-                      minHeight: 7,
-                      backgroundColor: NovaTheme.bg3,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        _isRunFailed ? NovaTheme.danger : NovaTheme.neonBlue,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    _steps.isEmpty
-                        ? t.t(status == 'queued' || status == 'waiting' ? 'session_queued' : 'monitor_sub')
-                        : t.t('steps_complete'),
-                    textAlign: TextAlign.end,
-                    style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 16),
 
             if (_isRunFailed) ...[
@@ -821,7 +818,83 @@ class _ReadyScreenState extends State<ReadyScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            const Center(child: WindowsCloudLogo(size: 145)),
+            SizedBox(
+              height: 190,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      'assets/nova_windows_bloom.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.12),
+                            const Color(0xD9050A1B),
+                          ],
+                        ),
+                      ),
+                    ),
+                    PositionedDirectional(
+                      start: 16,
+                      end: 16,
+                      bottom: 15,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.white.withOpacity(0.24)),
+                            ),
+                            child: const WindowsMark(size: 30),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'Windows 11 Pro',
+                                  textDirection: TextDirection.ltr,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  st.selectedRepo?.fullName ?? 'NOVA Windows Cloud',
+                                  textDirection: TextDirection.ltr,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFFD5E6FF),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 14),
             GlassCard(
               borderColor: NovaTheme.ok.withOpacity(0.55),

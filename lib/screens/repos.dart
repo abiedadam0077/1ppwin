@@ -306,12 +306,12 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
 
     return GlassCard(
       borderColor: selected
-          ? NovaTheme.neonPurple
+          ? NovaTheme.neonBlue
           : isReady
-              ? NovaTheme.ok.withOpacity(0.45)
+              ? NovaTheme.ok.withOpacity(0.38)
               : NovaTheme.cardBorder,
-      glowColor: selected ? NovaTheme.neonPurple : (isReady ? NovaTheme.ok : NovaTheme.neonBlue),
-      padding: const EdgeInsets.all(15),
+      glowColor: selected ? NovaTheme.neonBlue : (isReady ? NovaTheme.ok : NovaTheme.neonBlue),
+      padding: const EdgeInsets.all(12),
       onTap: () async {
         await st.selectRepo(r);
         if (!context.mounted) return;
@@ -325,22 +325,24 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 38,
+                height: 38,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: selected ? NovaTheme.purpleGradient : null,
+                  gradient: selected ? NovaTheme.btnGradient : null,
                   color: selected ? null : NovaTheme.bg2,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(11),
                   border: Border.all(
-                    color: selected ? NovaTheme.neonPurpleSoft : NovaTheme.cardBorder,
+                    color: selected ? NovaTheme.neonBlue.withOpacity(0.75) : NovaTheme.cardBorder,
                   ),
                 ),
                 child: Icon(
                   isReady ? Icons.cloud_done_rounded : Icons.inventory_2_outlined,
                   color: selected ? Colors.white : (isReady ? NovaTheme.ok : NovaTheme.neonBlue),
-                  size: 21,
+                  size: 20,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,7 +358,7 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: NovaTheme.text,
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -365,7 +367,7 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                           const SizedBox(width: 6),
                           StatusBadge(
                             label: t.t('selected_badge'),
-                            color: NovaTheme.neonPurpleSoft,
+                            color: NovaTheme.neonCyan,
                             icon: Icons.check,
                           ),
                         ],
@@ -385,10 +387,10 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 9),
           Wrap(
-            spacing: 8,
-            runSpacing: 6,
+            spacing: 6,
+            runSpacing: 5,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               StatusBadge(

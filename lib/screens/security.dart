@@ -254,64 +254,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Selected repository & current secret status card
-                    GlassCard(
-                      borderColor: st.secretsReady ? NovaTheme.ok.withOpacity(0.6) : NovaTheme.cardBorder,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.inventory_2_outlined, color: NovaTheme.neonCyan, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  repo.fullName,
-                                  style: const TextStyle(
-                                    color: NovaTheme.text,
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              StatusBadge(
-                                label: st.secretsReady ? t.t('ready') : t.t('needs_secrets'),
-                                color: st.secretsReady ? NovaTheme.ok : NovaTheme.warn,
-                                icon: st.secretsReady ? Icons.verified_user : Icons.lock_clock,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            t.t('security_sub'),
-                            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.4),
-                          ),
-                          const Divider(color: NovaTheme.cardBorder, height: 22),
-                          _secretStatusRow(
-                            Const.secretAccess,
-                            st.hasAccessSecret,
-                            requiredSecret: true,
-                            t: t,
-                          ),
-                          const SizedBox(height: 8),
-                          _secretStatusRow(
-                            Const.secretBackup,
-                            st.hasBackupSecret,
-                            requiredSecret: true,
-                            t: t,
-                          ),
-                          const SizedBox(height: 8),
-                          _secretStatusRow(
-                            Const.secretTailscale,
-                            st.hasTailscaleSecret,
-                            requiredSecret: false,
-                            t: t,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
                     if (st.secretsPermissionDenied || _localError != null) ...[
                       PermissionsGuideCard(
                         errorDetail: _localError ?? st.secretsError,
@@ -320,11 +262,67 @@ class _SecurityScreenState extends State<SecurityScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // Secret input fields
+                    // Repository context, live secret status, and editor share one form card.
                     GlassCard(
+                      borderColor: st.secretsReady ? NovaTheme.ok.withOpacity(0.55) : NovaTheme.cardBorder,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.inventory_2_outlined, color: NovaTheme.neonCyan, size: 19),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Directionality(
+                                  textDirection: TextDirection.ltr,
+                                  child: Text(
+                                    repo.fullName,
+                                    textAlign: TextAlign.left,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: NovaTheme.text,
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              StatusBadge(
+                                label: st.secretsReady ? t.t('ready') : t.t('needs_secrets'),
+                                color: st.secretsReady ? NovaTheme.ok : NovaTheme.warn,
+                                icon: st.secretsReady ? Icons.verified_user : Icons.lock_clock,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            t.t('security_sub'),
+                            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12, height: 1.35),
+                          ),
+                          const Divider(color: NovaTheme.cardBorder, height: 20),
+                          _secretStatusRow(
+                            Const.secretAccess,
+                            st.hasAccessSecret,
+                            requiredSecret: true,
+                            t: t,
+                          ),
+                          const SizedBox(height: 5),
+                          _secretStatusRow(
+                            Const.secretBackup,
+                            st.hasBackupSecret,
+                            requiredSecret: true,
+                            t: t,
+                          ),
+                          const SizedBox(height: 5),
+                          _secretStatusRow(
+                            Const.secretTailscale,
+                            st.hasTailscaleSecret,
+                            requiredSecret: false,
+                            t: t,
+                          ),
+                          const Divider(color: NovaTheme.cardBorder, height: 20),
                           NeonField(
                             label: t.t('access_password'),
                             hint: st.hasAccessSecret ? t.t('keep_existing_hint') : t.t('required_secret_hint'),

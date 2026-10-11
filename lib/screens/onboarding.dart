@@ -106,6 +106,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final device = st.deviceCode;
 
     return GlowBackground(
+      stars: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Center(
@@ -187,16 +188,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   style: const TextStyle(color: NovaTheme.textDim, fontSize: 13.5),
                 ),
                 const SizedBox(height: 20),
-                GlassCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Column(
                     children: [
                       _feature(Icons.desktop_windows_rounded, t.t('feature_vm')),
-                      const Divider(color: NovaTheme.cardBorder, height: 18),
+                      const SizedBox(height: 11),
                       _feature(Icons.enhanced_encryption_rounded, t.t('feature_backup')),
-                      const Divider(color: NovaTheme.cardBorder, height: 18),
+                      const SizedBox(height: 11),
                       _feature(Icons.lock_outline_rounded, t.t('feature_secrets')),
-                      const Divider(color: NovaTheme.cardBorder, height: 18),
+                      const SizedBox(height: 11),
                       _feature(Icons.public_rounded, t.t('feature_access')),
                     ],
                   ),
@@ -277,14 +278,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Expanded(
             child: Text(
               label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: NovaTheme.text,
                 fontSize: 13,
+                height: 1.18,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          const Icon(Icons.check_circle_outline, color: NovaTheme.ok, size: 16),
         ],
       );
 
@@ -487,6 +490,7 @@ class LoginSuccessScreen extends StatelessWidget {
     final avatar = st.user?['avatar_url'] as String?;
 
     return GlowBackground(
+      stars: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Center(
@@ -512,11 +516,14 @@ class LoginSuccessScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    CircleAvatar(
-                      radius: 56,
-                      backgroundColor: NovaTheme.card,
-                      backgroundImage: avatar != null ? NetworkImage(avatar) : null,
-                      child: avatar == null ? const Icon(Icons.person, size: 60, color: NovaTheme.text) : null,
+                    Container(
+                      width: 108,
+                      height: 108,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      child: const Icon(Icons.code_rounded, size: 66, color: NovaTheme.bg),
                     ),
                     Positioned(
                       bottom: 2,

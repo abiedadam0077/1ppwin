@@ -89,15 +89,15 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withOpacity(0.13),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.65), width: 1),
+        border: Border.all(color: color.withOpacity(0.56), width: 1),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.22),
-            blurRadius: 10,
+            color: color.withOpacity(0.14),
+            blurRadius: 8,
           ),
         ],
       ),
@@ -106,19 +106,19 @@ class StatusBadge extends StatelessWidget {
         children: [
           if (pulsing)
             SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(strokeWidth: 1.8, color: color),
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(strokeWidth: 1.7, color: color),
             )
           else if (icon != null)
-            Icon(icon, color: color, size: 14)
+            Icon(icon, color: color, size: 12)
           else
             Container(
-              width: 7,
-              height: 7,
+              width: 6,
+              height: 6,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Flexible(
             child: Text(
               label,
@@ -126,7 +126,7 @@ class StatusBadge extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
-                fontSize: 11.5,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -480,19 +480,22 @@ class NeonSwitch extends StatelessWidget {
 
 class GlowBackground extends StatelessWidget {
   final Widget child;
-  const GlowBackground({super.key, required this.child});
+  final bool stars;
+
+  const GlowBackground({super.key, required this.child, this.stars = false});
 
   @override
   Widget build(BuildContext context) {
     return Stack(
+      fit: StackFit.expand,
       children: [
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(0xFF040818),
-                Color(0xFF07102A),
-                Color(0xFF050A1E),
+                Color(0xFF050A1C),
+                Color(0xFF07132B),
+                Color(0xFF04091A),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -500,20 +503,20 @@ class GlowBackground extends StatelessWidget {
           ),
           child: SizedBox.expand(),
         ),
-        Positioned(
-          top: -110,
-          left: -70,
-          child: _glow(NovaTheme.neonPurple, 340),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(painter: _NovaAuroraPainter(stars: stars)),
+          ),
         ),
         Positioned(
-          top: 140,
-          right: -120,
-          child: _glow(NovaTheme.neonBlue, 300),
+          top: -150,
+          left: -140,
+          child: _glow(NovaTheme.neonPurple, 330),
         ),
         Positioned(
-          bottom: -130,
-          left: -60,
-          child: _glow(NovaTheme.neonBlue, 360),
+          top: 110,
+          right: -180,
+          child: _glow(NovaTheme.neonBlue, 320),
         ),
         SafeArea(child: child),
       ],
@@ -527,11 +530,139 @@ class GlowBackground extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              colors: [c.withOpacity(0.28), c.withOpacity(0.0)],
+              colors: [c.withOpacity(0.19), c.withOpacity(0.0)],
             ),
           ),
         ),
       );
+}
+
+class _NovaAuroraPainter extends CustomPainter {
+  final bool stars;
+
+  const _NovaAuroraPainter({this.stars = false});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (stars) {
+      for (var i = 0; i < 50; i++) {
+        final x = ((i * 47 + 13) % 101) / 101 * size.width;
+        final y = ((i * 29 + 7) % 100) / 100 * size.height * 0.66;
+        final radius = i % 7 == 0 ? 1.05 : 0.55;
+        final opacity = i % 4 == 0 ? 0.62 : 0.30;
+        canvas.drawCircle(
+          Offset(x, y),
+          radius,
+          Paint()..color = const Color(0xFFC9D9FF).withOpacity(opacity),
+        );
+      }
+    }
+
+    const colors = [
+      Color(0x343E8EFF),
+      Color(0x2E35B8F5),
+      Color(0x267B62FF),
+    ];
+    for (var i = 0; i < colors.length; i++) {
+      final baseY = size.height * (0.79 + i * 0.045);
+      final path = Path()
+        ..moveTo(-size.width * 0.08, baseY)
+        ..cubicTo(
+          size.width * 0.16,
+          baseY - size.height * 0.16,
+          size.width * 0.28,
+          baseY + size.height * 0.10,
+          size.width * 0.48,
+          baseY - size.height * 0.015,
+        )
+        ..cubicTo(
+          size.width * 0.68,
+          baseY - size.height * 0.14,
+          size.width * 0.81,
+          baseY + size.height * 0.11,
+          size.width * 1.08,
+          baseY - size.height * 0.045,
+        );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = i == 1 ? 1.5 : 1.0
+          ..strokeCap = StrokeCap.round
+          ..color = colors[i],
+      );
+    }
+
+    final bloom = Path()
+      ..moveTo(-size.width * 0.06, size.height * 0.88)
+      ..cubicTo(
+        size.width * 0.20,
+        size.height * 0.75,
+        size.width * 0.31,
+        size.height * 0.94,
+        size.width * 0.50,
+        size.height * 0.86,
+      )
+      ..cubicTo(
+        size.width * 0.69,
+        size.height * 0.76,
+        size.width * 0.85,
+        size.height * 0.95,
+        size.width * 1.06,
+        size.height * 0.82,
+      );
+    canvas.drawPath(
+      bloom,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 12
+        ..strokeCap = StrokeCap.round
+        ..color = NovaTheme.neonBlue.withOpacity(0.12)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _NovaAuroraPainter oldDelegate) => stars != oldDelegate.stars;
+}
+
+class WindowsMark extends StatelessWidget {
+  final double size;
+
+  const WindowsMark({super.key, this.size = 32});
+
+  @override
+  Widget build(BuildContext context) {
+    const colors = [
+      Color(0xFF8FE6FF),
+      Color(0xFF36C7FF),
+      Color(0xFF32A9FF),
+      Color(0xFF286EFF),
+    ];
+    return SizedBox(
+      width: size,
+      height: size,
+      child: GridView.count(
+        crossAxisCount: 2,
+        padding: EdgeInsets.zero,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: size * 0.07,
+        crossAxisSpacing: size * 0.07,
+        children: [
+          for (var i = 0; i < colors.length; i++)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors[i],
+                borderRadius: BorderRadius.circular(size * 0.035),
+                boxShadow: [
+                  BoxShadow(color: colors[i].withOpacity(0.3), blurRadius: size * 0.1),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Compact wordmark used in the dashboard and the launch screen.

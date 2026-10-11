@@ -1062,28 +1062,54 @@ class _ReadyScreenState extends State<ReadyScreen> {
     return '${d.inHours}h ${d.inMinutes % 60}m';
   }
 
-  Widget _row(String k, String v, {bool ltr = false, Widget? trailing}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 110,
-              child: Text(k, style: const TextStyle(color: NovaTheme.textDim, fontSize: 12)),
+  Widget _row(String k, String v, {bool ltr = false, Widget? trailing}) => LayoutBuilder(
+        builder: (context, constraints) {
+          final label = Text(
+            k,
+            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
+          );
+          final value = SelectableText(
+            v,
+            textDirection: ltr ? TextDirection.ltr : null,
+            textAlign: ltr ? TextAlign.left : TextAlign.start,
+            style: const TextStyle(
+              color: NovaTheme.text,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
-            Expanded(
-              child: SelectableText(
-                v,
-                textDirection: ltr ? TextDirection.ltr : null,
-                textAlign: ltr ? TextAlign.left : TextAlign.start,
-                style: const TextStyle(
-                  color: NovaTheme.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
+          );
+          final compact = constraints.maxWidth < 340;
+
+          if (compact) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  label,
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: value),
+                      if (trailing != null) trailing!,
+                    ],
+                  ),
+                ],
               ),
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                SizedBox(width: 110, child: label),
+                Expanded(child: value),
+                if (trailing != null) trailing!,
+              ],
             ),
-            if (trailing != null) trailing,
-          ],
-        ),
+          );
+        },
       );
 }

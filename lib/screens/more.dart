@@ -222,9 +222,6 @@ class SettingsScreen extends StatelessWidget {
     final login = st.user?['login'] as String? ?? '';
     final name = st.user?['name'] as String? ?? login;
     final avatar = st.user?['avatar_url'] as String?;
-    final forwardIcon = Directionality.of(context) == TextDirection.rtl
-        ? Icons.arrow_back_ios_rounded
-        : Icons.arrow_forward_ios_rounded;
 
     return GlowBackground(
       child: Scaffold(
@@ -252,6 +249,8 @@ class SettingsScreen extends StatelessWidget {
                         children: [
                           Text(
                             name.isNotEmpty ? name : (login.isNotEmpty ? login : 'GitHub User'),
+                            textDirection: login.isNotEmpty && name == login ? TextDirection.ltr : null,
+                            textAlign: TextAlign.start,
                             style: const TextStyle(
                               color: NovaTheme.text,
                               fontSize: 15,
@@ -261,6 +260,8 @@ class SettingsScreen extends StatelessWidget {
                           if (login.isNotEmpty)
                             Text(
                               '@$login',
+                              textDirection: TextDirection.ltr,
+                              textAlign: TextAlign.start,
                               style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12),
                             ),
                         ],
@@ -364,7 +365,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(forwardIcon, color: NovaTheme.neonCyan, size: 15),
+                  const Icon(Icons.arrow_forward_ios_rounded, color: NovaTheme.neonCyan, size: 15),
                 ],
               ),
             ),
@@ -381,7 +382,7 @@ class SettingsScreen extends StatelessWidget {
                       t.t('security'),
                       style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
-                    trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
                     onTap: () => Navigator.pushNamed(context, '/security'),
                   ),
                   const Divider(color: NovaTheme.cardBorder, height: 1),
@@ -391,7 +392,7 @@ class SettingsScreen extends StatelessWidget {
                       t.t('choose_repo'),
                       style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
-                    trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
                     onTap: () => Navigator.pushNamed(context, '/repos'),
                   ),
                   if (st.selectedRepo != null) ...[
@@ -402,7 +403,7 @@ class SettingsScreen extends StatelessWidget {
                         t.t('setup_repo_title'),
                         style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                       ),
-                      trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const RepoSetupScreen()),
                       ),
@@ -415,7 +416,7 @@ class SettingsScreen extends StatelessWidget {
                       t.t('use_pat_instead'),
                       style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
-                    trailing: Icon(forwardIcon, size: 14, color: NovaTheme.textDim),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
                     onTap: () => showPatSignInDialog(context),
                   ),
                 ],

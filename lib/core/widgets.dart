@@ -703,7 +703,7 @@ class NovaBottomNavigationBar extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: selected ? Colors.white : NovaTheme.textDim,
-                      fontSize: 9,
+                      fontSize: 8.5,
                       height: 1.02,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     ),

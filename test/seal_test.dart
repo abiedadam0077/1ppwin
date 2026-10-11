@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nova_windows_cloud/services/github_service.dart';
 import 'package:nova_windows_cloud/services/seal.dart';
+import 'package:nova_windows_cloud/state/app_state.dart';
 
 import 'fixtures/sodium_sealed_vectors.dart';
 
@@ -85,4 +88,48 @@ void main() {
     expect(() => GitHubSeal.open(Uint8List(47), Uint8List(32)), throwsArgumentError);
   });
 
+  test('assets/windows11.yml and .github/workflows/windows11.yml are valid and identical', () {
+    final assetYaml = File('assets/windows11.yml').readAsStringSync();
+    final repoYaml = File('.github/workflows/windows11.yml').readAsStringSync();
+    expect(assetYaml, repoYaml);
+    expect(WorkflowInspection.yamlNeedsRepair(assetYaml), isFalse);
+  });
+
+  test('WorkflowInspection.yamlNeedsRepair detects direct secrets in if condition', () {
+    const brokenYaml = '''
+      - name: Connect Tailscale (optional, for RDP)
+        env:
+          TS_KEY: \${{ secrets.TAILSCALE_AUTHKEY }}
+        if: \${{ secrets.TAILSCALE_AUTHKEY != '' }}
+        run: |
+          sudo tailscale up --authkey "\$TS_KEY"
+      - name: Upload session info artifact
+        uses: actions/upload-artifact@v4
+''';
+    expect(WorkflowInspection.yamlNeedsRepair(brokenYaml), isTrue);
+  });
+
+  test('BackupInfo.parseTagTimestamp extracts exact UTC time from release tag', () {
+    final dt = BackupInfo.parseTagTimestamp('win11-backup-20261011-053916');
+    expect(dt, DateTime.utc(2026, 10, 11, 5, 39, 16));
+  });
+
+  test('Repo and ActivityEntry serialize and deserialize cleanly', () {
+    final r = Repo(
+      fullName: 'abiedadam0077/1ppwin',
+      name: '1ppwin',
+      isPrivate: false,
+      description: 'Windows 11 Cloud',
+      defaultBranch: 'main',
+    );
+    final copy = Repo.fromJson(r.toJson());
+    expect(copy.fullName, r.fullName);
+    expect(copy.defaultBranch, 'main');
+
+    final entry = ActivityEntry(DateTime.utc(2026, 10, 11), 'act_save_secrets', true, detail: 'abiedadam0077/1ppwin');
+    final parsed = ActivityEntry.fromJson(entry.toJson());
+    expect(parsed.type, 'act_save_secrets');
+    expect(parsed.detail, 'abiedadam0077/1ppwin');
+    expect(parsed.ok, isTrue);
+  });
 }

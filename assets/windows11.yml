@@ -32,6 +32,16 @@ on:
         type: boolean
         required: false
         default: false
+      web_access:
+        description: "Start the password-protected browser viewer"
+        type: boolean
+        required: false
+        default: true
+      enable_rdp:
+        description: "Connect Tailscale for optional RDP access"
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: write # needed to store the backup in Releases
@@ -200,6 +210,7 @@ jobs:
           docker logs --tail 30 windows
 
       - name: Start web access (password-protected)
+        if: ${{ inputs.web_access }}
         env:
           ACCESS_PASSWORD: ${{ secrets.ACCESS_PASSWORD }}
         run: |
@@ -244,7 +255,7 @@ jobs:
           echo "=============================================================="
 
       - name: Connect Tailscale (optional, for RDP)
-        if: ${{ steps.secrets.outputs.tailscale == 'true' }}
+        if: ${{ inputs.enable_rdp && steps.secrets.outputs.tailscale == 'true' }}
         env:
           TS_KEY: ${{ secrets.TAILSCALE_AUTHKEY }}
         run: |

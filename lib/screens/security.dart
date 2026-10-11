@@ -250,7 +250,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 ),
               )
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -264,6 +264,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
 
                     // Repository context, live secret status, and editor share one form card.
                     GlassCard(
+                      padding: const EdgeInsets.all(14),
                       borderColor: st.secretsReady ? NovaTheme.ok.withOpacity(0.55) : NovaTheme.cardBorder,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,

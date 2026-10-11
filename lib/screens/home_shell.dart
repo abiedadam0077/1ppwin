@@ -152,12 +152,12 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
     if (!st.repoReady) {
       await _installOrRepairWorkflow(st, t);
       if (!mounted) return;
-      if (!st.secretsReady && !st.secretsPermissionDenied) {
+      if (!st.secretsReady) {
         Navigator.pushNamed(context, '/security');
       }
       return;
     }
-    if (!st.secretsReady && !st.secretsPermissionDenied) {
+    if (!st.secretsReady) {
       Navigator.pushNamed(context, '/security');
       return;
     }
@@ -224,36 +224,13 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                 ),
                 const SizedBox(height: 14),
               ],
-              // 1. HERO WINDOWS 11 STATUS PANEL
               _buildWindowsHeroCard(context, st, t),
-              const SizedBox(height: 14),
-
-              // 2. SELECTED REPOSITORY CARD
-              _buildSelectedRepoCard(context, st, t),
-              const SizedBox(height: 14),
-
-              // 3. GITHUB ACTIONS & SECRETS STATUS CARD
-              _buildActionsAndSecretsCard(context, st, t),
-              const SizedBox(height: 14),
-
-              // 4. LATEST BACKUP CARD
+              if (st.selectedRepo != null) ...[
+                const SizedBox(height: 12),
+                _buildSelectedRepoCard(context, st, t),
+              ],
+              const SizedBox(height: 12),
               _buildLatestBackupCard(context, st, t),
-              const SizedBox(height: 18),
-
-              // 5. QUICK CONTROL SHORTCUTS GRID
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Text(
-                  t.t('quick_shortcuts'),
-                  style: const TextStyle(
-                    color: NovaTheme.neonCyan,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildShortcutsGrid(context, st, t),
             ],
           ),
         ),
@@ -335,8 +312,11 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
 
   Widget _buildWindowsHeroCard(BuildContext context, AppState st, L10n t) {
     final isLive = st.isLiveRunActive;
-    final hasSessionInfo = st.sessionInfo != null && (st.sessionInfo?.webUrl != null || st.sessionInfo?.tailscaleIp != null);
-    final isReadyToStart = st.selectedRepo != null && st.repoReady && (st.secretsReady || st.secretsPermissionDenied);
+    final webUrl = st.sessionInfo?.webUrl;
+    final tailscaleIp = st.sessionInfo?.tailscaleIp;
+    final hasSessionInfo = (webUrl?.isNotEmpty ?? false) || (tailscaleIp?.isNotEmpty ?? false);
+    final expectsAccessRoute = st.webAccessEnabled || (st.rdpEnabled && st.hasTailscaleSecret);
+    final isReadyToStart = st.selectedRepo != null && st.repoReady && st.secretsReady;
     final remaining = _remainingTime(st);
 
     Color stateColor;
@@ -347,6 +327,10 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
       stateColor = NovaTheme.ok;
       stateLabel = t.t('win_state_running');
       stateIcon = Icons.check_circle;
+    } else if (isLive && (st.sessionInfo != null || !expectsAccessRoute)) {
+      stateColor = NovaTheme.warn;
+      stateLabel = t.t('no_access');
+      stateIcon = Icons.link_off_rounded;
     } else if (isLive) {
       stateColor = NovaTheme.neonCyan;
       stateLabel = t.t('win_state_starting');
@@ -373,7 +357,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
     } else if (!st.repoReady) {
       primaryButtonLabel = st.hasWorkflowFile ? t.t('repair_workflow') : t.t('install_workflow');
       primaryButtonIcon = Icons.auto_fix_high_rounded;
-    } else if (!st.secretsReady && !st.secretsPermissionDenied) {
+    } else if (!st.secretsReady) {
       primaryButtonLabel = t.t('security');
       primaryButtonIcon = Icons.lock_outline_rounded;
     } else {
@@ -384,7 +368,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
     return GlassCard(
       borderColor: isLive ? NovaTheme.ok.withOpacity(0.75) : NovaTheme.cardBorderBright.withOpacity(0.55),
       glowColor: isLive ? NovaTheme.ok : NovaTheme.neonPurple,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -405,7 +389,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                 label: stateLabel,
                 color: stateColor,
                 icon: stateIcon,
-                pulsing: (isLive && !hasSessionInfo) || (st.statusBusy && st.selectedRepo != null),
+                pulsing: (isLive && expectsAccessRoute && !hasSessionInfo) || (st.statusBusy && st.selectedRepo != null),
               ),
             ],
           ),
@@ -413,7 +397,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: SizedBox(
-              height: 156,
+              height: 132,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -531,7 +515,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                     _infoLine(Icons.public, t.t('web_link'), st.sessionInfo!.webUrl!),
                   if (st.sessionInfo?.tailscaleIp != null && st.sessionInfo!.tailscaleIp!.isNotEmpty)
                     _infoLine(Icons.desktop_windows_outlined, t.t('ip'), st.sessionInfo!.tailscaleIp!),
-                  if (st.sessionInfo == null)
+                  if (expectsAccessRoute && st.sessionInfo == null)
                     Row(
                       children: [
                         const SizedBox(
@@ -544,6 +528,19 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                           child: Text(
                             t.t('session_preparing'),
                             style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (!hasSessionInfo)
+                    Row(
+                      children: [
+                        const Icon(Icons.link_off_rounded, color: NovaTheme.warn, size: 15),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            t.t('session_no_access'),
+                            style: const TextStyle(color: NovaTheme.warn, fontSize: 11.5, height: 1.3),
                           ),
                         ),
                       ],
@@ -656,203 +653,100 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
 
   Widget _buildSelectedRepoCard(BuildContext context, AppState st, L10n t) {
     final repo = st.selectedRepo;
-    final isReady = repo != null && st.repoReady && st.secretsReady;
+    if (repo == null) return const SizedBox.shrink();
+
+    final workflowReady = st.repoReady;
+    final secretsReady = st.secretsReady;
+    final overallReady = workflowReady && secretsReady;
+    final secretsLabel = st.secretsPermissionDenied
+        ? t.t('permissions_needed')
+        : secretsReady
+            ? t.t('ready')
+            : t.t('needs_secrets');
 
     return GlassCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(13),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Icon(Icons.folder_special_rounded, color: NovaTheme.neonBlue, size: 21),
-              const SizedBox(width: 8),
+              const Icon(Icons.folder_special_rounded, color: NovaTheme.neonCyan, size: 20),
+              const SizedBox(width: 9),
               Expanded(
-                child: Text(
-                  t.t('selected_repo_card'),
-                  style: const TextStyle(
-                    color: NovaTheme.text,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.t('selected_repo_card'),
+                      style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
+                    ),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        repo.fullName,
+                        textAlign: TextAlign.left,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: NovaTheme.text, fontSize: 13, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (repo != null)
-                StatusBadge(
-                  label: isReady
-                      ? t.t('ready')
-                      : !st.repoReady
-                          ? (st.hasWorkflowFile ? t.t('needs_repair') : t.t('not_ready'))
-                          : t.t('needs_secrets'),
-                  color: isReady ? NovaTheme.ok : NovaTheme.warn,
-                  icon: isReady ? Icons.check_circle : Icons.info_outline,
-                ),
+              const SizedBox(width: 8),
+              StatusBadge(
+                label: st.statusBusy ? t.t('checking') : (overallReady ? t.t('ready') : t.t('not_ready')),
+                color: overallReady ? NovaTheme.ok : NovaTheme.warn,
+                icon: overallReady ? Icons.check_circle : Icons.info_outline,
+                pulsing: st.statusBusy,
+              ),
             ],
           ),
           const SizedBox(height: 10),
-          if (repo == null)
-            Text(
-              t.t('no_repo_selected_sub'),
-              style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.4),
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Text(
-                          repo.fullName,
-                          textAlign: TextAlign.left,
-                          style: const TextStyle(
-                            color: NovaTheme.text,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${repo.isPrivate ? t.t('private') : t.t('public')} • ${repo.defaultBranch}',
-                        style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: SecondaryNeonButton(
-                  label: t.t('manage_repos'),
-                  icon: Icons.swap_horiz_rounded,
-                  color: NovaTheme.neonCyan,
-                  onPressed: () => st.setTab(1),
-                ),
-              ),
-              if (repo != null && !st.repoReady) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SecondaryNeonButton(
-                    label: st.hasWorkflowFile ? t.t('repair_workflow') : t.t('install_workflow'),
-                    icon: Icons.auto_fix_high_rounded,
-                    color: NovaTheme.warn,
-                    busy: _setupBusy,
-                    onPressed: () => _installOrRepairWorkflow(st, t),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionsAndSecretsCard(BuildContext context, AppState st, L10n t) {
-    final run = st.latestRunData;
-    final runStatus = run?['status'] as String?;
-    final runConclusion = run?['conclusion'] as String?;
-
-    String runLabel;
-    Color runColor;
-    if (run == null) {
-      runLabel = t.t('run_status_none');
-      runColor = NovaTheme.textDim;
-    } else if (runStatus == 'in_progress') {
-      runLabel = t.t('run_status_in_progress');
-      runColor = NovaTheme.ok;
-    } else if (runStatus == 'queued' || runStatus == 'waiting') {
-      runLabel = t.t('run_status_queued');
-      runColor = NovaTheme.neonCyan;
-    } else if (runConclusion == 'success') {
-      runLabel = t.t('run_status_success');
-      runColor = NovaTheme.ok;
-    } else if (runConclusion == 'cancelled') {
-      runLabel = t.t('run_status_cancelled');
-      runColor = NovaTheme.warn;
-    } else {
-      runLabel = t.t('run_status_failure');
-      runColor = NovaTheme.danger;
-    }
-
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.bolt_rounded, color: NovaTheme.neonPurpleSoft, size: 22),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  t.t('actions_status_card'),
-                  style: const TextStyle(
-                    color: NovaTheme.text,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              StatusBadge(label: runLabel, color: runColor),
-            ],
-          ),
-          const SizedBox(height: 12),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 6,
+            runSpacing: 6,
             children: [
               StatusBadge(
-                label: 'Workflow: ${st.repoReady ? t.t('ready') : (st.hasWorkflowFile ? t.t('needs_repair') : t.t('not_ready'))}',
-                color: st.repoReady ? NovaTheme.ok : NovaTheme.warn,
-                icon: st.repoReady ? Icons.check_circle : Icons.account_tree_outlined,
+                label: '${t.t('workflow')}: ${workflowReady ? t.t('ready') : t.t('not_ready')}',
+                color: workflowReady ? NovaTheme.ok : NovaTheme.warn,
+                icon: workflowReady ? Icons.account_tree_rounded : Icons.build_circle_outlined,
               ),
               StatusBadge(
-                label: 'ACCESS_PASSWORD ${st.hasAccessSecret ? '✓' : '✗'}',
-                color: st.hasAccessSecret ? NovaTheme.ok : NovaTheme.warn,
-              ),
-              StatusBadge(
-                label: 'BACKUP_PASSWORD ${st.hasBackupSecret ? '✓' : '✗'}',
-                color: st.hasBackupSecret ? NovaTheme.ok : NovaTheme.warn,
-              ),
-              StatusBadge(
-                label: 'TAILSCALE ${st.hasTailscaleSecret ? '✓' : t.t('secret_optional')}',
-                color: st.hasTailscaleSecret ? NovaTheme.ok : NovaTheme.neonCyan,
+                label: '${t.t('secrets_status')}: $secretsLabel',
+                color: secretsReady ? NovaTheme.ok : NovaTheme.warn,
+                icon: secretsReady ? Icons.lock_rounded : Icons.lock_clock_outlined,
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 7),
           Row(
             children: [
               Expanded(
-                child: SecondaryNeonButton(
-                  label: t.t('security'),
-                  icon: Icons.vpn_key_outlined,
-                  color: st.secretsReady ? NovaTheme.neonCyan : NovaTheme.warn,
-                  onPressed: () => Navigator.pushNamed(context, '/security'),
-                ),
-              ),
-              if (run != null) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SecondaryNeonButton(
-                    label: t.t('monitor'),
-                    icon: Icons.timeline_rounded,
-                    color: NovaTheme.neonBlue,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ProgressScreen()),
-                      );
-                    },
+                child: TextButton.icon(
+                  onPressed: () => st.setTab(1),
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 17, color: NovaTheme.neonCyan),
+                  label: Text(
+                    t.t('manage_repos'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 11.5, fontWeight: FontWeight.w700),
                   ),
                 ),
-              ],
+              ),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () => Navigator.pushNamed(context, '/security'),
+                  icon: const Icon(Icons.vpn_key_outlined, size: 16, color: NovaTheme.neonPurpleSoft),
+                  label: Text(
+                    t.t('security'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: NovaTheme.neonPurpleSoft, fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -862,126 +756,64 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
 
   Widget _buildLatestBackupCard(BuildContext context, AppState st, L10n t) {
     final backup = st.latestCompleteBackup;
+    final backupState = st.backupsError != null
+        ? t.t('backups_load_failed')
+        : st.backupsBusy || st.backupsList == null
+            ? t.t('loading_backups')
+            : backup == null
+                ? (st.backupsList!.isEmpty ? t.t('no_backups') : t.t('backup_incomplete'))
+                : '${_fmtSize(backup.totalBytes)} · ${_fmtDate(backup.createdAt)}';
 
     return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      borderColor: backup != null ? NovaTheme.ok.withOpacity(0.42) : NovaTheme.cardBorder,
+      glowColor: backup != null ? NovaTheme.ok : NovaTheme.neonCyan,
+      onTap: () => st.setTab(2),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.cloud_done_outlined, color: NovaTheme.neonCyan, size: 21),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: (backup != null ? NovaTheme.ok : NovaTheme.neonCyan).withOpacity(0.13),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: (backup != null ? NovaTheme.ok : NovaTheme.neonCyan).withOpacity(0.3)),
+            ),
+            child: Icon(
+              backup != null ? Icons.cloud_done_rounded : Icons.backup_outlined,
+              color: backup != null ? NovaTheme.ok : NovaTheme.neonCyan,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   t.t('last_backup_card'),
-                  style: const TextStyle(
-                    color: NovaTheme.text,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
+                  style: const TextStyle(color: NovaTheme.text, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  backupState,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textDirection: backup != null ? TextDirection.ltr : null,
+                  textAlign: backup != null ? TextAlign.left : TextAlign.start,
+                  style: TextStyle(
+                    color: backup != null ? NovaTheme.textDim : (st.backupsError != null ? NovaTheme.danger : NovaTheme.textDim),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              StatusBadge(
-                label: backup != null ? _fmtSize(backup.totalBytes) : t.t('no_backups'),
-                color: backup != null ? NovaTheme.ok : NovaTheme.textDim,
-                icon: backup != null ? Icons.verified_rounded : Icons.hourglass_empty,
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            backup != null
-                ? '${_fmtDate(backup.createdAt)} • ${backup.tag}'
-                : t.t('no_backups_sub'),
-            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          SecondaryNeonButton(
-            label: t.t('backups'),
-            icon: Icons.settings_backup_restore_rounded,
-            color: NovaTheme.neonCyan,
-            onPressed: () => st.setTab(2),
-          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, color: NovaTheme.neonCyan, size: 22),
         ],
       ),
     );
   }
 
-  Widget _buildShortcutsGrid(BuildContext context, AppState st, L10n t) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide = constraints.maxWidth > 520;
-        final itemWidth = wide ? (constraints.maxWidth - 12) / 3 : (constraints.maxWidth - 10) / 2;
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SizedBox(
-              width: itemWidth,
-              child: QuickShortcutTile(
-                icon: Icons.rocket_launch_rounded,
-                title: t.t('session'),
-                subtitle: '${st.dispatchedHours} ${t.t('hours')}',
-                color: NovaTheme.neonBlue,
-                onTap: () => _handlePrimaryAction(st, t),
-              ),
-            ),
-            SizedBox(
-              width: itemWidth,
-              child: QuickShortcutTile(
-                icon: Icons.folder_open_rounded,
-                title: t.t('repos'),
-                subtitle: st.selectedRepo?.name ?? t.t('choose_repo'),
-                color: NovaTheme.neonPurpleSoft,
-                onTap: () => st.setTab(1),
-              ),
-            ),
-            SizedBox(
-              width: itemWidth,
-              child: QuickShortcutTile(
-                icon: Icons.enhanced_encryption_rounded,
-                title: t.t('security'),
-                subtitle: st.secretsReady ? t.t('ready') : t.t('needs_secrets'),
-                color: st.secretsReady ? NovaTheme.ok : NovaTheme.warn,
-                onTap: () => Navigator.pushNamed(context, '/security'),
-              ),
-            ),
-            SizedBox(
-              width: itemWidth,
-              child: QuickShortcutTile(
-                icon: Icons.backup_rounded,
-                title: t.t('backups'),
-                subtitle: st.latestCompleteBackup != null
-                    ? _fmtSize(st.latestCompleteBackup!.totalBytes)
-                    : t.t('no_backups'),
-                color: NovaTheme.neonCyan,
-                onTap: () => st.setTab(2),
-              ),
-            ),
-            SizedBox(
-              width: itemWidth,
-              child: QuickShortcutTile(
-                icon: Icons.history_rounded,
-                title: t.t('activity'),
-                subtitle: '${st.activity.length}',
-                color: NovaTheme.neonBlue,
-                onTap: () => st.setTab(3),
-              ),
-            ),
-            SizedBox(
-              width: itemWidth,
-              child: QuickShortcutTile(
-                icon: Icons.settings_rounded,
-                title: t.t('settings'),
-                subtitle: st.lang.toUpperCase(),
-                color: NovaTheme.neonPurpleSoft,
-                onTap: () => st.setTab(4),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }

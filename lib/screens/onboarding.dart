@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/l10n.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
+import '../services/auth_service.dart';
 import '../state/app_state.dart';
 
 Future<void> showPatSignInDialog(BuildContext context) async {
@@ -99,6 +100,24 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  final PageController _pages = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  void _goToPage(int page) {
+    if (page < 0 || page > 1) return;
+    _pages.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = L10n.of(context);
@@ -109,110 +128,259 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       stars: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Top language switcher bar
-                Align(
-                  alignment: AlignmentDirectional.topEnd,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: NovaTheme.card.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: NovaTheme.cardBorder),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: Row(
+                children: [
+                  if (_page == 1)
+                    IconButton(
+                      tooltip: t.t('back'),
+                      onPressed: () => _goToPage(0),
+                      icon: const Icon(Icons.arrow_back_rounded, color: NovaTheme.textDim),
+                    )
+                  else
+                    const SizedBox(width: 48),
+                  const Spacer(),
+                  _languageSwitcher(st),
+                ],
+              ),
+            ),
+            Expanded(
+              child: PageView(
+                controller: _pages,
+                onPageChanged: (page) => setState(() => _page = page),
+                children: [
+                  _welcomePage(t),
+                  _loginPage(t, st, device),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      2,
+                      (index) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: _page == index ? 20 : 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: _page == index ? NovaTheme.neonCyan : NovaTheme.textMuted.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _page == index
+                              ? [BoxShadow(color: NovaTheme.neonBlue.withOpacity(0.45), blurRadius: 8)]
+                              : null,
+                        ),
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  ),
+                  if (_page == 0) ...[
+                    const SizedBox(height: 12),
+                    GradientButton(
+                      label: t.t('get_started'),
+                      icon: Icons.arrow_forward_rounded,
+                      onPressed: () => _goToPage(1),
+                    ),
+                  ] else
+                    TextButton.icon(
+                      onPressed: () => _goToPage(0),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 17, color: NovaTheme.textDim),
+                      label: Text(
+                        t.t('welcome_back'),
+                        style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _languageSwitcher(AppState st) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+        decoration: BoxDecoration(
+          color: NovaTheme.card.withOpacity(0.84),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: NovaTheme.cardBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final l in const [
+              ['ar', 'عربي'],
+              ['en', 'EN'],
+              ['fr', 'FR'],
+            ])
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => st.setLang(l[0]),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: st.lang == l[0] ? NovaTheme.neonBlue : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    l[1],
+                    style: TextStyle(
+                      color: st.lang == l[0] ? Colors.white : NovaTheme.textDim,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+
+  Widget _welcomePage(L10n t) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 154,
+                    height: 154,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [NovaTheme.neonBlue.withOpacity(0.18), NovaTheme.bg.withOpacity(0.02)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(color: NovaTheme.neonBlue.withOpacity(0.18), blurRadius: 30),
+                        BoxShadow(color: NovaTheme.neonPurple.withOpacity(0.16), blurRadius: 42),
+                      ],
+                    ),
+                    child: const Center(child: WindowsCloudLogo(size: 150)),
+                  ),
+                  const SizedBox(height: 4),
+                  const Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Column(
                       children: [
-                        for (final l in const [
-                          ['ar', 'عربي'],
-                          ['en', 'EN'],
-                          ['fr', 'FR'],
-                        ])
-                          InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => st.setLang(l[0]),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: st.lang == l[0] ? NovaTheme.neonBlue : Colors.transparent,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Text(
-                                l[1],
-                                style: TextStyle(
-                                  color: st.lang == l[0] ? Colors.white : NovaTheme.textDim,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
+                        Text(
+                          'NOVA',
+                          style: TextStyle(
+                            color: NovaTheme.neonCyan,
+                            fontSize: 35,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4.5,
+                            shadows: [
+                              Shadow(color: NovaTheme.neonBlue, blurRadius: 24),
+                              Shadow(color: NovaTheme.neonPurple, blurRadius: 36),
+                            ],
                           ),
+                        ),
+                        Text(
+                          'Windows Cloud',
+                          style: TextStyle(
+                            color: NovaTheme.neonCyan,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const WindowsCloudLogo(size: 165),
-                const SizedBox(height: 10),
-                const Text(
-                  'NOVA',
-                  style: TextStyle(
-                    color: NovaTheme.neonCyan,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4.5,
-                    shadows: [
-                      Shadow(color: NovaTheme.neonBlue, blurRadius: 24),
-                      Shadow(color: NovaTheme.neonPurple, blurRadius: 36),
-                    ],
+                  const SizedBox(height: 5),
+                  Text(
+                    t.t('tagline'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: NovaTheme.textDim, fontSize: 13, height: 1.35),
+                  ),
+                  const SizedBox(height: 14),
+                  GlassCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Column(
+                      children: [
+                        _feature(Icons.desktop_windows_rounded, t.t('feature_vm')),
+                        const SizedBox(height: 8),
+                        _feature(Icons.enhanced_encryption_rounded, t.t('feature_backup')),
+                        const SizedBox(height: 8),
+                        _feature(Icons.lock_outline_rounded, t.t('feature_secrets')),
+                        const SizedBox(height: 8),
+                        _feature(Icons.public_rounded, t.t('feature_access')),
+                      ],
+                    ),
+                  ),
+                ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _loginPage(L10n t, AppState st, DeviceCode? device) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: NovaTheme.purpleGradient,
+                      boxShadow: [
+                        BoxShadow(color: NovaTheme.neonBlue.withOpacity(0.38), blurRadius: 22),
+                      ],
+                    ),
+                    child: const Icon(Icons.code_rounded, color: Colors.white, size: 34),
                   ),
                 ),
-                const Text(
-                  'Windows Cloud',
-                  style: TextStyle(
-                    color: NovaTheme.neonCyan,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 14),
                 Text(
-                  t.t('tagline'),
+                  t.t('login_github'),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: NovaTheme.textDim, fontSize: 13.5),
+                  style: const TextStyle(color: NovaTheme.text, fontSize: 19, fontWeight: FontWeight.w900),
                 ),
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Column(
-                    children: [
-                      _feature(Icons.desktop_windows_rounded, t.t('feature_vm')),
-                      const SizedBox(height: 11),
-                      _feature(Icons.enhanced_encryption_rounded, t.t('feature_backup')),
-                      const SizedBox(height: 11),
-                      _feature(Icons.lock_outline_rounded, t.t('feature_secrets')),
-                      const SizedBox(height: 11),
-                      _feature(Icons.public_rounded, t.t('feature_access')),
-                    ],
-                  ),
+                const SizedBox(height: 4),
+                Text(
+                  t.t('login_secure_hint'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.4),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 if (st.authError != null) _errorCard(t, st),
-                if (device != null && st.deviceWaiting) _deviceCard(t, st, device.userCode),
-                if (device == null || !st.deviceWaiting) ...[
+                if (device != null && st.deviceWaiting)
+                  _deviceCard(t, st, device.userCode)
+                else ...[
                   GradientButton(
                     label: t.t('login_code'),
                     icon: Icons.vpn_key_rounded,
                     busy: st.authBusy,
                     onPressed: () => context.read<AppState>().startDeviceLogin(),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 9),
+                  TextButton.icon(
+                    onPressed: st.authBusy ? null : () => context.read<AppState>().startLogin(),
+                    icon: const Icon(Icons.open_in_browser_rounded, size: 17, color: NovaTheme.textDim),
+                    label: Text(
+                      t.t('login_browser'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5),
+                    ),
+                  ),
                   SecondaryNeonButton(
                     label: t.t('login_pat'),
                     icon: Icons.key_rounded,
@@ -220,61 +388,76 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     busy: st.authBusy,
                     onPressed: () => showPatSignInDialog(context),
                   ),
-                  const SizedBox(height: 6),
-                  TextButton.icon(
-                    onPressed: st.authBusy ? null : () => context.read<AppState>().startLogin(),
-                    icon: const Icon(Icons.open_in_browser, size: 17, color: NovaTheme.textDim),
-                    label: Text(
-                      t.t('login_browser'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5),
-                    ),
-                  ),
                 ],
-                const SizedBox(height: 4),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: () => _showClientSecretDialog(context),
-                      child: Text(t.t('advanced'), style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12)),
-                    ),
-                    TextButton(
-                      onPressed: () => _showPasteDialog(context),
-                      child: Text(t.t('paste_link'), style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12)),
-                    ),
-                  ],
-                ),
                 if (st.clientSecretSaved)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: StatusBadge(
-                      label: t.t('secret_saved'),
-                      color: NovaTheme.ok,
-                      icon: Icons.check_circle,
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Center(
+                      child: StatusBadge(
+                        label: t.t('secret_saved'),
+                        color: NovaTheme.ok,
+                        icon: Icons.check_circle,
+                      ),
                     ),
                   ),
+                const SizedBox(height: 10),
+                GlassCard(
+                  padding: EdgeInsets.zero,
+                  radius: 16,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+                      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                      iconColor: NovaTheme.neonCyan,
+                      collapsedIconColor: NovaTheme.textDim,
+                      title: Text(
+                        t.t('advanced'),
+                        style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, fontWeight: FontWeight.w700),
+                      ),
+                      children: [
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 4,
+                          children: [
+                            TextButton(
+                              onPressed: () => _showClientSecretDialog(context),
+                              child: Text(
+                                t.t('client_secret'),
+                                style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 11.5),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => _showPasteDialog(context),
+                              child: Text(
+                                t.t('paste_link'),
+                                style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 11.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
 
   Widget _feature(IconData icon, String label) => Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(7),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: NovaTheme.neonBlue.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: NovaTheme.neonBlue.withOpacity(0.4)),
             ),
-            child: Icon(icon, color: NovaTheme.neonCyan, size: 18),
+            child: Icon(icon, color: NovaTheme.neonCyan, size: 17),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
               label,
@@ -282,8 +465,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: NovaTheme.text,
-                fontSize: 13,
-                height: 1.18,
+                fontSize: 12.5,
+                height: 1.13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -503,31 +686,29 @@ class LoginSuccessScreen extends StatelessWidget {
                   alignment: Alignment.center,
                   children: [
                     Container(
-                      width: 124,
-                      height: 124,
+                      width: 128,
+                      height: 128,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: NovaTheme.btnGradient,
                         boxShadow: [
-                          BoxShadow(
-                            color: NovaTheme.neonBlue.withOpacity(0.45),
-                            blurRadius: 28,
-                          ),
+                          BoxShadow(color: NovaTheme.neonBlue.withOpacity(0.42), blurRadius: 28),
+                          BoxShadow(color: NovaTheme.neonPurple.withOpacity(0.2), blurRadius: 36),
                         ],
                       ),
                     ),
                     Container(
-                      width: 108,
-                      height: 108,
+                      width: 110,
+                      height: 110,
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
+                        color: NovaTheme.bg2,
                       ),
-                      child: const Icon(Icons.code_rounded, size: 66, color: NovaTheme.bg),
+                      child: const Center(child: WindowsCloudLogo(size: 102)),
                     ),
-                    Positioned(
+                    PositionedDirectional(
                       bottom: 2,
-                      right: 2,
+                      end: 2,
                       child: Container(
                         padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
@@ -535,22 +716,23 @@ class LoginSuccessScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: NovaTheme.bg, width: 2.5),
                         ),
-                        child: const Icon(Icons.check, color: Colors.white, size: 18),
+                        child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 16),
                 StatusBadge(label: t.t('login_ok'), color: NovaTheme.ok, icon: Icons.verified_user),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
-                  '${t.t('welcome')} ${name.isNotEmpty ? name : login}',
+                  '${t.t('welcome')} ${name.isNotEmpty ? name : (login.isNotEmpty ? login : t.t('app_name'))}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+                  style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 16),
                 GlassCard(
                   borderColor: NovaTheme.ok.withOpacity(0.5),
+                  padding: const EdgeInsets.all(14),
                   child: Row(
                     children: [
                       CircleAvatar(
@@ -565,13 +747,20 @@ class LoginSuccessScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              name.isNotEmpty ? name : login,
+                              name.isNotEmpty ? name : (login.isNotEmpty ? login : t.t('app_name')),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(color: NovaTheme.text, fontSize: 15, fontWeight: FontWeight.w800),
                             ),
-                            Text(
-                              '@$login',
-                              style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12),
-                            ),
+                            if (login.isNotEmpty)
+                              Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: Text(
+                                  '@$login',
+                                  textAlign: TextAlign.left,
+                                  style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -579,13 +768,13 @@ class LoginSuccessScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: 18),
                 GradientButton(
                   label: t.t('continue'),
                   icon: Icons.dashboard_customize_rounded,
                   onPressed: onContinue,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 TextButton.icon(
                   onPressed: () => context.read<AppState>().logout(),
                   icon: const Icon(Icons.logout, size: 16, color: NovaTheme.textDim),

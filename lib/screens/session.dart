@@ -21,232 +21,356 @@ class SessionSetupScreen extends StatefulWidget {
 
 class _SessionSetupScreenState extends State<SessionSetupScreen> {
   double _hours = 4;
-  bool _restore = true;
   bool _fresh = false;
   bool _rdp = true;
   bool _web = true;
   bool _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    final st = context.read<AppState>();
+    _hours = st.sessionHours.toDouble();
+    _fresh = st.sessionFreshInstall;
+    _web = st.webAccessEnabled;
+    _rdp = st.rdpEnabled;
+  }
+
+  void _setFresh(AppState st, bool fresh) {
+    setState(() => _fresh = fresh);
+    st.updateSessionOptions(fresh: fresh);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = L10n.of(context);
     final st = context.watch<AppState>();
-    final h = _hours.round();
+    final repo = st.selectedRepo;
+    final h = _hours.round().clamp(1, Const.maxSessionHours).toInt();
     final latestBackup = st.latestCompleteBackup;
+    final backupLabel = latestBackup != null
+        ? latestBackup.tag
+        : st.backupsError != null
+            ? t.t('backups_load_failed')
+            : st.backupsBusy || st.backupsList == null
+                ? t.t('loading_backups')
+                : st.backupsList!.isEmpty
+                    ? t.t('no_backups')
+                    : t.t('backup_incomplete');
 
     return GlowBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: Text(t.t('session'))),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                t.t('session_sub'),
-                style: const TextStyle(color: NovaTheme.textDim, fontSize: 13, height: 1.4),
-              ),
-              const SizedBox(height: 16),
-
-              // Duration & Boot Options Card
-              GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
+        body: repo == null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: NovaEmptyState(
+                    icon: Icons.folder_open_rounded,
+                    title: t.t('no_repo_selected'),
+                    subtitle: t.t('no_repo_selected_sub'),
+                    color: NovaTheme.neonCyan,
+                    action: GradientButton(
+                      label: t.t('choose_repo'),
+                      icon: Icons.folder_open_rounded,
+                      onPressed: () {
+                        st.setTab(1);
+                        Navigator.of(context).maybePop();
+                      },
+                    ),
+                  ),
+                ),
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                       children: [
-                        const Icon(Icons.timer_outlined, color: NovaTheme.neonCyan, size: 20),
-                        const SizedBox(width: 8),
                         Text(
-                          t.t('duration'),
-                          style: const TextStyle(
-                            color: NovaTheme.text,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          t.t('session_sub'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.35),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Slider.adaptive(
-                      value: _hours,
-                      min: 1,
-                      max: Const.maxSessionHours.toDouble(),
-                      divisions: Const.maxSessionHours - 1,
-                      activeColor: NovaTheme.neonBlue,
-                      onChanged: (v) => setState(() => _hours = v),
-                    ),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('1h', style: TextStyle(color: NovaTheme.textDim, fontSize: 11.5)),
-                          Text(
-                            '${Const.maxSessionHours}h',
-                            style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      '$h ${t.t('hours')}  ·  ${h * 60} ${t.t('minutes')}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: NovaTheme.neonCyan,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Divider(color: NovaTheme.cardBorder, height: 24),
-                    NeonSwitch(
-                      label: t.t('restore_prev'),
-                      icon: Icons.restore_rounded,
-                      value: _restore,
-                      onChanged: (v) => setState(() {
-                        _restore = v;
-                        _fresh = !v;
-                      }),
-                    ),
-                    NeonSwitch(
-                      label: t.t('fresh_install'),
-                      icon: Icons.cleaning_services_outlined,
-                      value: _fresh,
-                      onChanged: (v) => setState(() {
-                        _fresh = v;
-                        _restore = !v;
-                      }),
-                    ),
-                    if (_fresh)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6, bottom: 4),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: NovaTheme.warn.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: NovaTheme.warn.withOpacity(0.6)),
-                          ),
-                          child: Row(
+                        const SizedBox(height: 12),
+                        GlassCard(
+                          padding: const EdgeInsets.all(14),
+                          borderColor: NovaTheme.neonBlue.withOpacity(0.55),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const Icon(Icons.warning_amber_rounded, color: NovaTheme.warn, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  t.t('fresh_warn'),
-                                  style: const TextStyle(color: NovaTheme.warn, fontSize: 11.5),
+                              Row(
+                                children: [
+                                  const Icon(Icons.timer_outlined, color: NovaTheme.neonCyan, size: 19),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      t.t('duration'),
+                                      style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                  StatusBadge(
+                                    label: '$h ${t.t('hours')}',
+                                    color: NovaTheme.neonCyan,
+                                    icon: Icons.schedule_rounded,
+                                  ),
+                                ],
+                              ),
+                              Slider.adaptive(
+                                value: _hours,
+                                min: 1,
+                                max: Const.maxSessionHours.toDouble(),
+                                divisions: Const.maxSessionHours - 1,
+                                activeColor: NovaTheme.neonBlue,
+                                onChanged: (value) {
+                                  setState(() => _hours = value);
+                                  st.updateSessionOptions(hours: value.round());
+                                },
+                              ),
+                              Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('1h', style: TextStyle(color: NovaTheme.textDim, fontSize: 11)),
+                                    Text(
+                                      '${Const.maxSessionHours}h',
+                                      style: const TextStyle(color: NovaTheme.textDim, fontSize: 11),
+                                    ),
+                                  ],
                                 ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${h * 60} ${t.t('minutes')}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
+                              ),
+                              const Divider(color: NovaTheme.cardBorder, height: 22),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _bootOption(
+                                      icon: Icons.restore_rounded,
+                                      label: t.t('restore_prev'),
+                                      selected: !_fresh,
+                                      onTap: () => _setFresh(st, false),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _bootOption(
+                                      icon: Icons.cleaning_services_outlined,
+                                      label: t.t('fresh_install'),
+                                      selected: _fresh,
+                                      onTap: () => _setFresh(st, true),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (_fresh) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(9),
+                                  decoration: BoxDecoration(
+                                    color: NovaTheme.warn.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(11),
+                                    border: Border.all(color: NovaTheme.warn.withOpacity(0.48)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.warning_amber_rounded, color: NovaTheme.warn, size: 17),
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        child: Text(
+                                          t.t('fresh_warn'),
+                                          style: const TextStyle(color: NovaTheme.warn, fontSize: 11, height: 1.3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              const Divider(color: NovaTheme.cardBorder, height: 22),
+                              Row(
+                                children: [
+                                  const Icon(Icons.public_rounded, color: NovaTheme.neonCyan, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      t.t('session_options'),
+                                      style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12.5, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              NeonSwitch(
+                                label: t.t('web_access'),
+                                sub: 'Cloudflare HTTPS Tunnel',
+                                icon: Icons.language_rounded,
+                                value: _web,
+                                onChanged: (value) {
+                                  setState(() => _web = value);
+                                  st.updateSessionOptions(webAccess: value);
+                                },
+                              ),
+                              NeonSwitch(
+                                label: t.t('enable_rdp'),
+                                sub: st.hasTailscaleSecret
+                                    ? 'TAILSCALE_AUTHKEY ✓'
+                                    : 'TAILSCALE_AUTHKEY (${t.t('secret_optional')})',
+                                icon: Icons.desktop_windows_outlined,
+                                value: _rdp,
+                                onChanged: (value) {
+                                  setState(() => _rdp = value);
+                                  st.updateSessionOptions(enableRdp: value);
+                                },
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    const Divider(color: NovaTheme.cardBorder, height: 22),
-                    NeonSwitch(
-                      label: t.t('web_access'),
-                      sub: 'Cloudflare HTTPS Tunnel',
-                      icon: Icons.public,
-                      value: _web,
-                      onChanged: (v) => setState(() => _web = v),
-                    ),
-                    NeonSwitch(
-                      label: t.t('enable_rdp'),
-                      sub: st.hasTailscaleSecret ? 'TAILSCALE_AUTHKEY ✓' : 'TAILSCALE_AUTHKEY (${t.t('secret_optional')})',
-                      icon: Icons.desktop_windows_outlined,
-                      value: _rdp,
-                      onChanged: (v) => setState(() => _rdp = v),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Summary Card
-              GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.fact_check_outlined, color: NovaTheme.neonCyan, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          t.t('summary'),
-                          style: const TextStyle(
-                            color: NovaTheme.neonCyan,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
+                        const SizedBox(height: 12),
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.fact_check_outlined, color: NovaTheme.neonCyan, size: 18),
+                                  const SizedBox(width: 7),
+                                  Text(
+                                    t.t('summary'),
+                                    style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12.5, fontWeight: FontWeight.w800),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: Text(
+                                  repo.fullName,
+                                  textAlign: TextAlign.left,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  StatusBadge(
+                                    label: '$h ${t.t('hours')}',
+                                    color: NovaTheme.neonBlue,
+                                    icon: Icons.timer_outlined,
+                                  ),
+                                  StatusBadge(
+                                    label: t.t(_fresh ? 'fresh_install' : 'restore_session'),
+                                    color: _fresh ? NovaTheme.warn : NovaTheme.neonPurpleSoft,
+                                    icon: _fresh ? Icons.cleaning_services_outlined : Icons.restore_rounded,
+                                  ),
+                                  StatusBadge(
+                                    label: backupLabel,
+                                    color: latestBackup != null ? NovaTheme.ok : NovaTheme.textDim,
+                                    icon: latestBackup != null ? Icons.cloud_done_rounded : Icons.backup_outlined,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    _sumRow(t.t('repo'), st.selectedRepo?.fullName ?? '—', ltr: st.selectedRepo != null),
-                    _sumRow(t.t('duration'), '$h ${t.t('hours')} (${h * 60} ${t.t('minutes')})'),
-                    _sumRow(t.t('type'), _fresh ? t.t('fresh_install') : t.t('restore_session')),
-                    _sumRow(
-                      t.t('last_backup_card'),
-                      latestBackup != null ? latestBackup.tag : t.t('no_backups'),
-                      ltr: latestBackup != null,
+                  ),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                      child: GradientButton(
+                        label: t.t('start_windows'),
+                        icon: Icons.rocket_launch_rounded,
+                        busy: _busy,
+                        onPressed: _busy
+                            ? null
+                            : () async {
+                                setState(() => _busy = true);
+                                try {
+                                  await st.startRun(
+                                    hours: h,
+                                    fresh: _fresh,
+                                    webAccess: _web,
+                                    enableRdp: _rdp,
+                                  );
+                                  if (context.mounted) {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (_) => const ProgressScreen()),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('${t.t('error')}: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) setState(() => _busy = false);
+                                }
+                              },
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 22),
-
-              GradientButton(
-                label: t.t('start_windows'),
-                icon: Icons.rocket_launch_rounded,
-                busy: _busy,
-                onPressed: st.selectedRepo == null
-                    ? null
-                    : () async {
-                        setState(() => _busy = true);
-                        try {
-                          await st.startRun(hours: h, fresh: _fresh);
-                          if (context.mounted) {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(builder: (_) => const ProgressScreen()),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('${t.t('error')}: $e')),
-                            );
-                          }
-                        } finally {
-                          if (mounted) setState(() => _busy = false);
-                        }
-                      },
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
 
-  Widget _sumRow(String k, String v, {bool ltr = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 115,
-              child: Text(k, style: const TextStyle(color: NovaTheme.textDim, fontSize: 12)),
-            ),
-            Expanded(
-              child: Text(
-                v,
-                textDirection: ltr ? TextDirection.ltr : null,
-                textAlign: ltr ? TextAlign.left : TextAlign.start,
-                style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w700),
+  Widget _bootOption({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) => InkWell(
+        borderRadius: BorderRadius.circular(13),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          constraints: const BoxConstraints(minHeight: 66),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+          decoration: BoxDecoration(
+            color: selected ? NovaTheme.neonBlue.withOpacity(0.16) : NovaTheme.bg2.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: selected ? NovaTheme.neonCyan.withOpacity(0.75) : NovaTheme.cardBorder),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                color: selected ? NovaTheme.neonCyan : NovaTheme.textMuted,
+                size: 17,
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? NovaTheme.text : NovaTheme.textDim,
+                    fontSize: 10.5,
+                    height: 1.2,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(icon, color: selected ? NovaTheme.neonCyan : NovaTheme.textMuted, size: 16),
+            ],
+          ),
         ),
       );
 }
@@ -327,7 +451,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
       final status = candidate['status'] as String? ?? '';
       if (status != 'queued' && status != 'waiting') {
         _steps = await st.api!.runSteps(repoName, id);
-        if (st.sessionInfo == null || st.sessionInfo?.webUrl == null) {
+        final needsWebInfo = st.webAccessEnabled && st.sessionInfo?.webUrl == null;
+        final needsRdpInfo = st.rdpEnabled && st.hasTailscaleSecret && st.sessionInfo?.tailscaleIp == null;
+        if (needsWebInfo || needsRdpInfo) {
           final info = await st.api!.sessionInfo(repoName, id);
           if (info != null) st.sessionInfo = info;
         }
@@ -336,7 +462,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
       _error = null;
       if (mounted) setState(() {});
 
-      if (_isRunning && st.sessionInfo != null && !_navigatedToReady) {
+      final expectsAccessRoute = st.webAccessEnabled || (st.rdpEnabled && st.hasTailscaleSecret);
+      if (_isRunning && (st.sessionInfo != null || !expectsAccessRoute) && !_navigatedToReady) {
         _navigatedToReady = true;
         _goReady();
       }
@@ -371,7 +498,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return null;
   }
 
-  int get _completedStepCount => _steps.where((step) => step.status == 'completed').length;
+  int get _completedStepCount => _steps
+      .where((step) => step.status == 'completed' && (step.conclusion == 'success' || step.conclusion == 'skipped'))
+      .length;
 
   double? get _stepProgress =>
       _steps.isEmpty ? null : (_completedStepCount / _steps.length).clamp(0.0, 1.0).toDouble();
@@ -493,7 +622,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                             ? t.t('windows_running')
                             : status == 'queued' || status == 'waiting'
                                 ? t.t('session_queued')
-                                : t.t('monitor_sub'),
+                                : t.t('session_preparing'),
                     color: _isRunFailed
                         ? NovaTheme.danger
                         : _isRunning
@@ -572,7 +701,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         setState(() => _repairing = true);
                         try {
                           await st.installOrRepairWorkflow();
-                          await st.startRun(hours: st.dispatchedHours, fresh: false);
+                          await st.startRun(
+                            hours: st.dispatchedHours,
+                            fresh: st.sessionFreshInstall,
+                            webAccess: st.webAccessEnabled,
+                            enableRdp: st.rdpEnabled,
+                          );
                           _run = null;
                           _steps = [];
                           await _poll();
@@ -776,7 +910,9 @@ class _ReadyScreenState extends State<ReadyScreen> {
         return;
       }
     }
-    if (st.sessionInfo == null || st.sessionInfo?.webUrl == null) {
+    final needsWebInfo = st.webAccessEnabled && st.sessionInfo?.webUrl == null;
+    final needsRdpInfo = st.rdpEnabled && st.hasTailscaleSecret && st.sessionInfo?.tailscaleIp == null;
+    if (needsWebInfo || needsRdpInfo) {
       final info = await st.api!.sessionInfo(repoName, st.runId!);
       if (info != null) st.sessionInfo = info;
     }
@@ -812,11 +948,34 @@ class _ReadyScreenState extends State<ReadyScreen> {
           children: [
             Center(
               child: StatusBadge(
-                label: t.t('connected'),
-                color: NovaTheme.ok,
-                icon: Icons.check_circle,
+                label: hasWebUrl || hasTsIp ? t.t('connected') : t.t('no_access'),
+                color: hasWebUrl || hasTsIp ? NovaTheme.ok : NovaTheme.warn,
+                icon: hasWebUrl || hasTsIp ? Icons.check_circle : Icons.link_off_rounded,
               ),
             ),
+            if (!hasWebUrl && !hasTsIp) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: NovaTheme.warn.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: NovaTheme.warn.withOpacity(0.48)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.link_off_rounded, color: NovaTheme.warn, size: 17),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t.t('session_no_access'),
+                        style: const TextStyle(color: NovaTheme.warn, fontSize: 11.5, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             SizedBox(
               height: 190,
@@ -980,37 +1139,48 @@ class _ReadyScreenState extends State<ReadyScreen> {
                   if (hasTsIp)
                     _row(
                       t.t('ip'),
-                      tsIp,
+                      tsIp!,
                       ltr: true,
                       trailing: IconButton(
                         icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: tsIp));
+                          Clipboard.setData(ClipboardData(text: tsIp!));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(t.t('rdp_copied'))),
                           );
                         },
                       ),
+                    )
+                  else if (st.rdpEnabled)
+                    _row(
+                      t.t('ip'),
+                      st.hasTailscaleSecret ? t.t('rdp_waiting') : t.t('rdp_secret_hint'),
                     ),
                   _row(
                     t.t('web_link'),
-                    hasWebUrl ? webUrl : t.t('waiting_web_link'),
-                    ltr: hasWebUrl,
-                    trailing: hasWebUrl
-                        ? IconButton(
-                            icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: webUrl));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(t.t('code_copied'))),
-                              );
-                            },
-                          )
-                        : const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: NovaTheme.neonCyan),
-                          ),
+                    !st.webAccessEnabled
+                        ? t.t('access_disabled')
+                        : hasWebUrl
+                            ? webUrl!
+                            : t.t('waiting_web_link'),
+                    ltr: st.webAccessEnabled && hasWebUrl,
+                    trailing: !st.webAccessEnabled
+                        ? null
+                        : hasWebUrl
+                            ? IconButton(
+                                icon: const Icon(Icons.copy, size: 17, color: NovaTheme.neonCyan),
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: webUrl!));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(t.t('code_copied'))),
+                                  );
+                                },
+                              )
+                            : const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: NovaTheme.neonCyan),
+                              ),
                   ),
                   const SizedBox(height: 14),
                   if (hasWebUrl)
@@ -1018,7 +1188,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
                       label: t.t('open_windows'),
                       icon: Icons.open_in_new_rounded,
                       onPressed: () => launchUrl(
-                        Uri.parse(webUrl),
+                        Uri.parse(webUrl!),
                         mode: LaunchMode.externalApplication,
                       ),
                     ),

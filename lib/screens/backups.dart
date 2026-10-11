@@ -50,7 +50,7 @@ class _BackupsScreenState extends State<BackupsScreen> {
 
   String _relativeTime(DateTime d, L10n t) {
     final diff = DateTime.now().difference(d);
-    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 1) return t.t('just_now');
     if (diff.inMinutes < 60) return '${t.t('ago_min')} ${diff.inMinutes}m';
     if (diff.inHours < 24) return '${t.t('ago_min')} ${diff.inHours}h';
     return '${t.t('ago_min')} ${diff.inDays}d';
@@ -238,7 +238,7 @@ class _BackupsScreenState extends State<BackupsScreen> {
       onRefresh: () => st.loadBackups(),
       color: NovaTheme.neonBlue,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
           // Repository context pill
           Row(
@@ -267,6 +267,7 @@ class _BackupsScreenState extends State<BackupsScreen> {
 
           // Latest Complete Backup Hero Card
           GlassCard(
+            padding: const EdgeInsets.all(14),
             borderColor: firstComplete != null ? NovaTheme.ok.withOpacity(0.65) : NovaTheme.cardBorder,
             glowColor: firstComplete != null ? NovaTheme.ok : NovaTheme.neonBlue,
             child: Column(
@@ -302,7 +303,7 @@ class _BackupsScreenState extends State<BackupsScreen> {
                           const SizedBox(height: 2),
                           Text(
                             firstComplete == null
-                                ? t.t('no_backups')
+                                ? (backups.isEmpty ? t.t('no_backups') : t.t('backup_incomplete'))
                                 : '${_fmtDate(firstComplete.createdAt)} (${_relativeTime(firstComplete.createdAt, t)})',
                             style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
                           ),
@@ -347,7 +348,7 @@ class _BackupsScreenState extends State<BackupsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
           Text(
             t.t('available'),
@@ -381,7 +382,7 @@ class _BackupsScreenState extends State<BackupsScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: GlassCard(
-                padding: const EdgeInsets.all(15),
+                padding: const EdgeInsets.all(12),
                 borderColor: b.complete ? NovaTheme.ok.withOpacity(0.55) : NovaTheme.warn.withOpacity(0.55),
                 glowColor: b.complete ? NovaTheme.ok : NovaTheme.warn,
                 child: Column(
@@ -524,9 +525,11 @@ class _BackupsScreenState extends State<BackupsScreen> {
               setState(() => _restoring = true);
               try {
                 await st.startRun(
-                  hours: st.dispatchedHours,
+                  hours: st.sessionHours,
                   fresh: false,
                   isRestore: true,
+                  webAccess: st.webAccessEnabled,
+                  enableRdp: st.rdpEnabled,
                 );
                 if (context.mounted) {
                   Navigator.of(context).push(

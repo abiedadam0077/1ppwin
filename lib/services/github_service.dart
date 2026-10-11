@@ -76,9 +76,9 @@ class WorkflowInspection {
     this.sha,
   });
 
-  /// Checks whether a `windows11.yml` workflow file has the invalid
-  /// `if: ${{ secrets.TAILSCALE_AUTHKEY != '' }}` expression or is missing
-  /// mobile session-info artifact support or safe Tailscale guard.
+  /// Checks whether a workflow is missing the NOVA dispatch inputs,
+  /// mobile session-info artifact support, or safe Tailscale guards, or uses
+  /// the invalid `if: ${{ secrets.TAILSCALE_AUTHKEY != '' }}` expression.
   static bool yamlNeedsRepair(String yaml) {
     final directSecretsInIf = RegExp(
       r'^\s*if:\s*.*(?<!steps\.)\bsecrets\.',
@@ -86,6 +86,9 @@ class WorkflowInspection {
     );
     if (directSecretsInIf.hasMatch(yaml)) return true;
     if (!yaml.contains('Upload session info artifact')) return true;
+    // Dispatching inputs that an older workflow does not declare is rejected by
+    // GitHub. Repair it before sending the session's web/RDP preferences.
+    if (!yaml.contains('web_access:') || !yaml.contains('enable_rdp:')) return true;
     if (yaml.contains('tailscale up') &&
         !yaml.contains('steps.secrets.outputs.tailscale') &&
         !yaml.contains('if [ -z "\$TS_KEY" ]')) {
@@ -270,7 +273,9 @@ class GitHubService {
 
     final fallback = await findWindowsWorkflow(repo);
     if (fallback != null) {
-      return WorkflowInspection(exists: true, workflowFile: fallback, needsRepair: false);
+      // Only the NOVA-managed workflow declares all dispatch inputs and uploads
+      // the session-info artifact required by the mobile progress/ready screens.
+      return WorkflowInspection(exists: true, workflowFile: fallback, needsRepair: true);
     }
     return const WorkflowInspection(exists: false);
   }
@@ -418,11 +423,18 @@ class GitHubService {
     String workflowFile, {
     required int hours,
     required bool fresh,
+    bool webAccess = true,
+    bool enableRdp = true,
     String branch = 'main',
   }) async {
     await _send('POST', '/repos/$repo/actions/workflows/$workflowFile/dispatches', body: {
       'ref': branch,
-      'inputs': {'hours': '$hours', 'fresh_install': fresh ? 'true' : 'false'},
+      'inputs': {
+        'hours': '$hours',
+        'fresh_install': fresh ? 'true' : 'false',
+        'web_access': webAccess ? 'true' : 'false',
+        'enable_rdp': enableRdp ? 'true' : 'false',
+      },
     });
   }
 

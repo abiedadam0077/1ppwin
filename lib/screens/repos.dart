@@ -82,7 +82,7 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
             IconButton(
               tooltip: t.t('new_repo'),
               icon: const Icon(Icons.add_circle_outline, color: NovaTheme.neonBlue),
-              onPressed: () => _createDialog(context, st),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateRepoScreen())),
             ),
           ],
         ),
@@ -253,7 +253,7 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
               ? GradientButton(
                   label: t.t('new_repo'),
                   icon: Icons.add,
-                  onPressed: () => _createDialog(context, st),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateRepoScreen())),
                 )
               : SecondaryNeonButton(
                   label: t.t('clear_search_filter'),
@@ -494,100 +494,131 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
       ),
     );
   }
+}
 
-  void _createDialog(BuildContext context, AppState st) {
+/// Dedicated, compact form for creating and optionally configuring a repository.
+class CreateRepoScreen extends StatefulWidget {
+  const CreateRepoScreen({super.key});
+
+  @override
+  State<CreateRepoScreen> createState() => _CreateRepoScreenState();
+}
+
+class _CreateRepoScreenState extends State<CreateRepoScreen> {
+  final TextEditingController _name = TextEditingController();
+  bool _isPrivate = true;
+  bool _autoWorkflow = true;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createRepository() async {
     final t = L10n.of(context);
-    final name = TextEditingController();
-    var isPrivate = true;
-    var autoWorkflow = true;
-    var creating = false;
+    final st = context.read<AppState>();
+    final name = _name.text.trim();
+    if (name.isEmpty || _busy) return;
 
-    showDialog(
-      context: context,
-      builder: (c) => StatefulBuilder(
-        builder: (c, set) => AlertDialog(
-          backgroundColor: NovaTheme.card,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-          title: Row(
-            children: [
-              const Icon(Icons.create_new_folder_outlined, color: NovaTheme.neonCyan, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  t.t('new_repo'),
-                  style: const TextStyle(color: NovaTheme.text, fontSize: 16, fontWeight: FontWeight.w800),
+    setState(() => _busy = true);
+    try {
+      await st.createAndSetupRepo(
+        name,
+        isPrivate: _isPrivate,
+        installWorkflow: _autoWorkflow,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const RepoSetupScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${t.t('error')}: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = L10n.of(context);
+    return GlowBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(title: Text(t.t('new_repo'))),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+          children: [
+            Center(
+              child: Container(
+                width: 74,
+                height: 74,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: NovaTheme.purpleGradient,
+                  boxShadow: [
+                    BoxShadow(color: NovaTheme.neonBlue.withOpacity(0.28), blurRadius: 22),
+                    BoxShadow(color: NovaTheme.neonPurple.withOpacity(0.16), blurRadius: 30),
+                  ],
                 ),
+                child: const Icon(Icons.create_new_folder_rounded, color: Colors.white, size: 34),
               ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              NeonField(
-                label: t.t('repo_name'),
-                controller: name,
-                textDirection: TextDirection.ltr,
-                keyboardType: TextInputType.text,
-                textInputAction: TextInputAction.done,
-                prefixIcon: Icons.folder_outlined,
-              ),
-              const SizedBox(height: 12),
-              NeonSwitch(
-                label: t.t('private'),
-                icon: Icons.lock_outline,
-                value: isPrivate,
-                onChanged: (v) => set(() => isPrivate = v),
-              ),
-              NeonSwitch(
-                label: t.t('auto_setup_workflow'),
-                icon: Icons.account_tree_outlined,
-                value: autoWorkflow,
-                onChanged: (v) => set(() => autoWorkflow = v),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: creating ? null : () => Navigator.pop(c),
-              child: Text(t.t('cancel'), style: const TextStyle(color: NovaTheme.textDim)),
             ),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: NovaTheme.neonBlue),
-              onPressed: creating
-                  ? null
-                  : () async {
-                      final n = name.text.trim();
-                      if (n.isEmpty) return;
-                      set(() => creating = true);
-                      try {
-                        await st.createAndSetupRepo(
-                          n,
-                          isPrivate: isPrivate,
-                          installWorkflow: autoWorkflow,
-                        );
-                        if (c.mounted) Navigator.pop(c);
-                        if (context.mounted) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const RepoSetupScreen()),
-                          );
-                        }
-                      } catch (e) {
-                        set(() => creating = false);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('${t.t('error')}: $e')),
-                          );
-                        }
-                      }
-                    },
-              icon: creating
-                  ? const SizedBox(
-                      width: 15,
-                      height: 15,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.check, size: 17),
-              label: Text(t.t('create')),
+            const SizedBox(height: 14),
+            Text(
+              t.t('create_repo_sub'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.4),
+            ),
+            const SizedBox(height: 18),
+            GlassCard(
+              padding: const EdgeInsets.all(15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  NeonField(
+                    label: t.t('repo_name'),
+                    controller: _name,
+                    textDirection: TextDirection.ltr,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.done,
+                    prefixIcon: Icons.folder_outlined,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 10),
+                  NeonSwitch(
+                    label: t.t('private'),
+                    sub: t.t('repo_visibility_hint'),
+                    icon: Icons.lock_outline_rounded,
+                    value: _isPrivate,
+                    onChanged: (value) => setState(() => _isPrivate = value),
+                  ),
+                  const Divider(color: NovaTheme.cardBorder, height: 18),
+                  NeonSwitch(
+                    label: t.t('auto_setup_workflow'),
+                    sub: t.t('auto_workflow_hint'),
+                    icon: Icons.account_tree_outlined,
+                    value: _autoWorkflow,
+                    onChanged: (value) => setState(() => _autoWorkflow = value),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            GradientButton(
+              label: t.t('create'),
+              icon: Icons.check_rounded,
+              busy: _busy,
+              onPressed: _name.text.trim().isNotEmpty && !_busy ? _createRepository : null,
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
+              child: Text(t.t('cancel'), style: const TextStyle(color: NovaTheme.textDim)),
             ),
           ],
         ),

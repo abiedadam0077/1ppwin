@@ -132,15 +132,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       ),
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                       itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (c, i) {
                         final e = items[i];
                         final color = e.ok ? NovaTheme.ok : NovaTheme.danger;
                         final title = t.t(e.type);
                         return GlassCard(
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.all(12),
                           borderColor: color.withOpacity(0.45),
                           glowColor: color,
                           child: Row(
@@ -220,7 +220,7 @@ class SettingsScreen extends StatelessWidget {
     final t = L10n.of(context);
     final st = context.watch<AppState>();
     final login = st.user?['login'] as String? ?? '';
-    final name = st.user?['name'] as String? ?? login;
+    final name = (st.user?['name'] as String? ?? '').trim();
     final avatar = st.user?['avatar_url'] as String?;
 
     return GlowBackground(
@@ -228,57 +228,52 @@ class SettingsScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: Text(t.t('settings'))),
         body: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 22),
           children: [
-            // User Profile Card
-            if (st.token != null)
+            if (st.token != null) ...[
               GlassCard(
-                borderColor: NovaTheme.neonBlue.withOpacity(0.55),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                borderColor: NovaTheme.neonBlue.withOpacity(0.48),
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 26,
+                      radius: 22,
                       backgroundColor: NovaTheme.bg2,
                       backgroundImage: avatar != null ? NetworkImage(avatar) : null,
-                      child: avatar == null ? const Icon(Icons.person, color: NovaTheme.text) : null,
+                      child: avatar == null ? const Icon(Icons.person, color: NovaTheme.textDim) : null,
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            name.isNotEmpty ? name : (login.isNotEmpty ? login : 'GitHub User'),
-                            textDirection: login.isNotEmpty && name == login ? TextDirection.ltr : null,
-                            textAlign: TextAlign.start,
-                            style: const TextStyle(
-                              color: NovaTheme.text,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            name.isNotEmpty ? name : (login.isNotEmpty ? login : t.t('github_user')),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textDirection: login.isNotEmpty && name.isEmpty ? TextDirection.ltr : null,
+                            style: const TextStyle(color: NovaTheme.text, fontSize: 14, fontWeight: FontWeight.w800),
                           ),
                           if (login.isNotEmpty)
-                            Text(
-                              '@$login',
+                            Directionality(
                               textDirection: TextDirection.ltr,
-                              textAlign: TextAlign.start,
-                              style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12),
+                              child: Text(
+                                '@$login',
+                                textAlign: TextAlign.left,
+                                style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 11.5),
+                              ),
                             ),
                         ],
                       ),
                     ),
-                    StatusBadge(
-                      label: t.t('connected'),
-                      color: NovaTheme.ok,
-                      icon: Icons.verified_user,
-                    ),
+                    StatusBadge(label: t.t('connected'), color: NovaTheme.ok, icon: Icons.verified_user_rounded),
                   ],
                 ),
               ),
-            const SizedBox(height: 14),
-
-            // Language Selection Card
+              const SizedBox(height: 10),
+            ],
             GlassCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -288,66 +283,53 @@ class SettingsScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         t.t('language'),
-                        style: const TextStyle(
-                          color: NovaTheme.neonCyan,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 13, fontWeight: FontWeight.w800),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  for (final l in const [
-                    ['ar', 'العربية (Arabic — RTL)'],
-                    ['en', 'English (LTR)'],
-                    ['fr', 'Français (LTR)'],
-                  ])
-                    RadioListTile<String>(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        l[1],
-                        style: TextStyle(
-                          color: st.lang == l[0] ? Colors.white : NovaTheme.textDim,
-                          fontSize: 13.5,
-                          fontWeight: st.lang == l[0] ? FontWeight.w800 : FontWeight.w500,
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final language in const [
+                        ['ar', 'العربية'],
+                        ['en', 'English'],
+                        ['fr', 'Français'],
+                      ])
+                        ChoiceChip(
+                          label: Text(language[1], style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                          selected: st.lang == language[0],
+                          selectedColor: NovaTheme.neonBlue.withOpacity(0.72),
+                          backgroundColor: NovaTheme.bg2,
+                          side: BorderSide(
+                            color: st.lang == language[0] ? NovaTheme.neonCyan.withOpacity(0.8) : NovaTheme.cardBorder,
+                          ),
+                          labelStyle: TextStyle(
+                            color: st.lang == language[0] ? Colors.white : NovaTheme.textDim,
+                          ),
+                          onSelected: (_) => st.setLang(language[0]),
                         ),
-                      ),
-                      value: l[0],
-                      groupValue: st.lang,
-                      activeColor: NovaTheme.neonBlue,
-                      onChanged: (v) => st.setLang(v!),
-                    ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-
-            // Current repository is visible at a glance and opens the picker.
+            const SizedBox(height: 10),
             GlassCard(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
               borderColor: st.selectedRepo == null ? NovaTheme.cardBorder : NovaTheme.neonPurple.withOpacity(0.5),
               glowColor: NovaTheme.neonPurple,
               onTap: () => st.setTab(1),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: NovaTheme.neonPurple.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.folder_special_rounded, color: NovaTheme.neonPurpleSoft, size: 21),
-                  ),
-                  const SizedBox(width: 12),
+                  const Icon(Icons.folder_special_rounded, color: NovaTheme.neonPurpleSoft, size: 21),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          t.t('settings_current_repo'),
-                          style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5),
-                        ),
+                        Text(t.t('settings_current_repo'), style: const TextStyle(color: NovaTheme.textDim, fontSize: 11)),
                         const SizedBox(height: 2),
                         Text(
                           st.selectedRepo?.fullName ?? t.t('no_current_repo'),
@@ -355,112 +337,101 @@ class SettingsScreen extends StatelessWidget {
                           textAlign: st.selectedRepo != null ? TextAlign.left : TextAlign.start,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: NovaTheme.text,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w800),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios_rounded, color: NovaTheme.neonCyan, size: 15),
+                  const Icon(Icons.chevron_right_rounded, color: NovaTheme.neonCyan, size: 22),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-
-            // Management & Configuration Links
+            const SizedBox(height: 10),
             GlassCard(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.lock_outline, color: NovaTheme.neonBlue),
-                    title: Text(
-                      t.t('security'),
-                      style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
+                  _settingsItem(
+                    icon: Icons.lock_outline_rounded,
+                    color: NovaTheme.neonBlue,
+                    label: t.t('security'),
                     onTap: () => Navigator.pushNamed(context, '/security'),
                   ),
                   const Divider(color: NovaTheme.cardBorder, height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.folder_open_rounded, color: NovaTheme.neonCyan),
-                    title: Text(
-                      t.t('choose_repo'),
-                      style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
-                    onTap: () => Navigator.pushNamed(context, '/repos'),
+                  _settingsItem(
+                    icon: Icons.folder_open_rounded,
+                    color: NovaTheme.neonCyan,
+                    label: t.t('choose_repo'),
+                    onTap: () => st.setTab(1),
                   ),
                   if (st.selectedRepo != null) ...[
                     const Divider(color: NovaTheme.cardBorder, height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.tune_rounded, color: NovaTheme.neonPurpleSoft),
-                      title: Text(
-                        t.t('setup_repo_title'),
-                        style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
+                    _settingsItem(
+                      icon: Icons.tune_rounded,
+                      color: NovaTheme.neonPurpleSoft,
+                      label: t.t('setup_repo_title'),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const RepoSetupScreen()),
                       ),
                     ),
                   ],
                   const Divider(color: NovaTheme.cardBorder, height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.key_rounded, color: NovaTheme.warn),
-                    title: Text(
-                      t.t('use_pat_instead'),
-                      style: const TextStyle(color: NovaTheme.text, fontSize: 13.5, fontWeight: FontWeight.w700),
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: NovaTheme.textDim),
+                  _settingsItem(
+                    icon: Icons.key_rounded,
+                    color: NovaTheme.warn,
+                    label: t.t('use_pat_instead'),
                     onTap: () => showPatSignInDialog(context),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-
-            // Permissions & GitHub App Guide
-            const PermissionsGuideCard(),
-            const SizedBox(height: 14),
-
-            // About Card
+            const SizedBox(height: 10),
             GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.info_outline_rounded, color: NovaTheme.neonCyan, size: 19),
-                      const SizedBox(width: 8),
-                      Text(
-                        t.t('about'),
-                        style: const TextStyle(
-                          color: NovaTheme.neonCyan,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+              padding: EdgeInsets.zero,
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+                  childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+                  iconColor: NovaTheme.warn,
+                  collapsedIconColor: NovaTheme.textDim,
+                  leading: const Icon(Icons.admin_panel_settings_outlined, color: NovaTheme.warn, size: 20),
+                  title: Text(
+                    t.t('permissions_title'),
+                    style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'NOVA Windows Cloud v1.2\n'
-                    '• Windows 11 Pro VM on GitHub Actions (KVM + Docker)\n'
-                    '• Auth: GitHub Device Flow + OAuth PKCE + PAT\n'
-                    '• Secrets: On-device Libsodium crypto_box_seal (X25519 + XSalsa20-Poly1305)\n'
-                    '• Backups: AES-256-CBC + Zstandard encrypted disk snapshots in GitHub Releases',
-                    style: TextStyle(color: NovaTheme.textDim, fontSize: 12, height: 1.6),
-                  ),
-                ],
+                  children: const [PermissionsGuideCard()],
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-
+            const SizedBox(height: 10),
+            GlassCard(
+              padding: EdgeInsets.zero,
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  iconColor: NovaTheme.neonCyan,
+                  collapsedIconColor: NovaTheme.textDim,
+                  leading: const Icon(Icons.info_outline_rounded, color: NovaTheme.neonCyan, size: 20),
+                  title: Text(
+                    t.t('about'),
+                    style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w700),
+                  ),
+                  children: [
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        t.t('about_sub'),
+                        style: const TextStyle(color: NovaTheme.textDim, fontSize: 11.5, height: 1.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
             SecondaryNeonButton(
               label: t.t('logout'),
               icon: Icons.logout_rounded,
@@ -472,4 +443,26 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _settingsItem({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) => ListTile(
+        dense: true,
+        visualDensity: const VisualDensity(horizontal: -1, vertical: -3),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+        minLeadingWidth: 28,
+        horizontalTitleGap: 8,
+        leading: Icon(icon, color: color, size: 19),
+        title: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: NovaTheme.text, fontSize: 12.5, fontWeight: FontWeight.w700),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, size: 19, color: NovaTheme.textDim),
+        onTap: onTap,
+      );
 }

@@ -4,6 +4,42 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def requestedTasks = gradle.startParameter.taskNames.collect { it.toLowerCase() }
+def releaseTaskRequested = requestedTasks.any { taskName ->
+    taskName.contains("release") || taskName == "assemble" || taskName == "build" ||
+        taskName.endsWith(":assemble") || taskName.endsWith(":build")
+}
+
+def releaseKeystorePath = System.getenv("NOVA_RELEASE_KEYSTORE_PATH")?.trim()
+def releaseStorePassword = System.getenv("NOVA_RELEASE_STORE_PASSWORD")
+def releaseKeyAlias = System.getenv("NOVA_RELEASE_KEY_ALIAS")?.trim()
+def releaseKeyPassword = System.getenv("NOVA_RELEASE_KEY_PASSWORD")
+
+if (releaseTaskRequested) {
+    def missingSigningValues = []
+    if (!releaseKeystorePath) missingSigningValues << "NOVA_RELEASE_KEYSTORE_PATH"
+    if (!releaseStorePassword) missingSigningValues << "NOVA_RELEASE_STORE_PASSWORD"
+    if (!releaseKeyAlias) missingSigningValues << "NOVA_RELEASE_KEY_ALIAS"
+    if (!releaseKeyPassword) missingSigningValues << "NOVA_RELEASE_KEY_PASSWORD"
+
+    if (!missingSigningValues.isEmpty()) {
+        throw new GradleException(
+            "Release signing is mandatory. Missing environment variable(s): " +
+                missingSigningValues.join(", ") +
+                ". Configure the persistent nova_release keystore; unsigned/debug-signed release APKs are disabled."
+        )
+    }
+    if (releaseKeyAlias != "nova_release") {
+        throw new GradleException("NOVA_RELEASE_KEY_ALIAS must be exactly nova_release.")
+    }
+    if (!file(releaseKeystorePath).isFile()) {
+        throw new GradleException(
+            "Release signing keystore was not found at NOVA_RELEASE_KEYSTORE_PATH. " +
+                "No release APK will be produced."
+        )
+    }
+}
+
 android {
     namespace = "app.nova.windowscloud"
     compileSdk = 35
@@ -26,9 +62,23 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
+    signingConfigs {
         release {
-            signingConfig = signingConfigs.debug
+            // A missing key never falls back to the debug signing config.
+            storeFile = file(releaseKeystorePath ?: "${buildDir}/missing-release-key.jks")
+            storePassword = releaseStorePassword ?: ""
+            keyAlias = releaseKeyAlias ?: ""
+            keyPassword = releaseKeyPassword ?: ""
+        }
+    }
+
+    buildTypes {
+        debug {
+            manifestPlaceholders.put("admobAppId", "ca-app-pub-3940256099942544~3347511713")
+        }
+        release {
+            manifestPlaceholders.put("admobAppId", "ca-app-pub-8333402469736519~5380632760")
+            signingConfig = signingConfigs.release
         }
     }
 }

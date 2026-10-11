@@ -7,6 +7,7 @@ on:
       - "lib/**"
       - "android/**"
       - "assets/**"
+      - "docs/**"
       - "test/**"
       - "pubspec.yaml"
       - "pubspec.lock"
@@ -20,6 +21,7 @@ on:
       - "lib/**"
       - "android/**"
       - "assets/**"
+      - "docs/**"
       - "test/**"
       - "pubspec.yaml"
       - "pubspec.lock"
@@ -58,14 +60,15 @@ jobs:
           cache: true
 
       - name: Resolve dependencies
-        id: dependencies
         run: |
           mkdir -p .ci
-          flutter pub get --enforce-lockfile 2>&1 | tee .ci/pub-get.log
+          # Adding an SDK dependency changes pubspec.lock. Pub preserves already
+          # locked compatible versions and resolves only what is newly required.
+          flutter pub get 2>&1 | tee .ci/pub-get.log
 
       - name: Analyze & test
         run: |
-          # Run both checks, but preserve their exit codes rather than hiding failures.
+          # Run both checks and preserve both exit codes for diagnostics.
           set +e
           flutter analyze --no-fatal-infos 2>&1 | tee .ci/analyze.log
           analyze_status=$?
@@ -81,12 +84,140 @@ jobs:
           BUILD_STATUS: ${{ job.status }}
         run: python3 .github/scripts/report-build-diagnostics.py
 
-      - name: Build release APK
-        # Compile and publish only after the analyzer and tests both pass.
+      - name: Build debug validation APK
+        # This validates Android/plugin compilation only. It is never uploaded
+        # or used as a fallback for the signed Release APK.
+        run: |
+          flutter build apk --debug 2>&1 | tee .ci/debug-build.log
+
+      - name: Prepare persistent release signing
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          NOVA_RELEASE_KEYSTORE_BASE64: ${{ secrets.NOVA_RELEASE_KEYSTORE_BASE64 }}
+          NOVA_RELEASE_STORE_PASSWORD: ${{ secrets.NOVA_RELEASE_STORE_PASSWORD }}
+          NOVA_RELEASE_KEY_ALIAS: ${{ secrets.NOVA_RELEASE_KEY_ALIAS }}
+          NOVA_RELEASE_KEY_PASSWORD: ${{ secrets.NOVA_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            NOVA_RELEASE_KEYSTORE_BASE64 \
+            NOVA_RELEASE_STORE_PASSWORD \
+            NOVA_RELEASE_KEY_ALIAS \
+            NOVA_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf '::error::Release signing is mandatory. Missing GitHub Actions secret(s): %s. No unsigned or Debug-signed Release APK will be produced.\n' "${missing[*]}"
+            exit 1
+          fi
+          if [[ "$NOVA_RELEASE_KEY_ALIAS" != "nova_release" ]]; then
+            echo "::error::NOVA_RELEASE_KEY_ALIAS must be exactly nova_release."
+            exit 1
+          fi
+
+          KEYSTORE="$RUNNER_TEMP/nova-release.jks"
+          if ! printf '%s' "$NOVA_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"; then
+            echo "::error::NOVA_RELEASE_KEYSTORE_BASE64 is not valid Base64."
+            rm -f "$KEYSTORE"
+            exit 1
+          fi
+          chmod 600 "$KEYSTORE"
+          if [[ ! -s "$KEYSTORE" ]]; then
+            echo "::error::The decoded release keystore is empty."
+            exit 1
+          fi
+
+          CERT_INFO="$RUNNER_TEMP/nova-release-certificate.txt"
+          if ! keytool -list -v \
+            -keystore "$KEYSTORE" \
+            -alias "$NOVA_RELEASE_KEY_ALIAS" \
+            -storepass "$NOVA_RELEASE_STORE_PASSWORD" \
+            > "$CERT_INFO" 2> "$RUNNER_TEMP/nova-keytool-error.txt"; then
+            echo "::error::Could not validate the release keystore, store password, or nova_release alias. Secret values were not printed."
+            exit 1
+          fi
+          CERT_SHA256="$(awk -F': ' '/SHA256:/{gsub(":", "", $2); print tolower($2); exit}' "$CERT_INFO")"
+          if [[ -z "$CERT_SHA256" ]]; then
+            echo "::error::The release certificate SHA-256 fingerprint could not be read."
+            exit 1
+          fi
+
+          echo "NOVA_RELEASE_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+          echo "NOVA_RELEASE_CERT_SHA256=$CERT_SHA256" >> "$GITHUB_ENV"
+          echo "Release certificate SHA-256: $CERT_SHA256"
+
+      - name: Build signed release APK
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          NOVA_RELEASE_STORE_PASSWORD: ${{ secrets.NOVA_RELEASE_STORE_PASSWORD }}
+          NOVA_RELEASE_KEY_ALIAS: ${{ secrets.NOVA_RELEASE_KEY_ALIAS }}
+          NOVA_RELEASE_KEY_PASSWORD: ${{ secrets.NOVA_RELEASE_KEY_PASSWORD }}
         run: |
           flutter build apk --release 2>&1 | tee .ci/build.log
-          cp build/app/outputs/flutter-apk/app-release.apk NOVA-Windows-Cloud.apk
+
+      - name: Verify package ID, AdMob app ID, and release signature
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          set -euo pipefail
+          APK="$PWD/build/app/outputs/flutter-apk/app-release.apk"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ ! -s "$APK" ]]; then
+            echo "::error::The signed Release APK was not produced."
+            exit 1
+          fi
+          if [[ -z "$SDK_ROOT" || ! -d "$SDK_ROOT/build-tools" ]]; then
+            echo "::error::Android SDK build-tools could not be located for APK verification."
+            exit 1
+          fi
+
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt -print | sort -V | tail -n 1)"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          if [[ -z "$AAPT" || -z "$APKSIGNER" ]]; then
+            echo "::error::aapt or apksigner is missing; refusing to publish an unchecked APK."
+            exit 1
+          fi
+
+          PACKAGE="$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p" | head -n 1)"
+          if [[ "$PACKAGE" != "app.nova.windowscloud" ]]; then
+            echo "::error::Unexpected applicationId in APK: ${PACKAGE:-not found}."
+            exit 1
+          fi
+          echo "Verified applicationId: $PACKAGE"
+
+          MANIFEST_DUMP="$RUNNER_TEMP/nova-release-manifest.txt"
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > "$MANIFEST_DUMP"
+          if ! grep -Fq 'ca-app-pub-8333402469736519~5380632760' "$MANIFEST_DUMP"; then
+            echo "::error::Release APK does not contain the configured production AdMob App ID."
+            exit 1
+          fi
+          echo "Verified production AdMob App ID is present in the release manifest."
+
+          SIGNATURE_INFO="$RUNNER_TEMP/nova-apksigner.txt"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > "$SIGNATURE_INFO"
+          EXPECTED="$(printf '%s' "$NOVA_RELEASE_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          ACTUAL="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$SIGNATURE_INFO" | head -n 1 | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "$ACTUAL" || "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "::error::APK signer SHA-256 does not match the persistent nova_release keystore certificate."
+            exit 1
+          fi
+          echo "Verified release signer SHA-256: $ACTUAL"
+
+          cp "$APK" NOVA-Windows-Cloud.apk
           sha256sum NOVA-Windows-Cloud.apk > NOVA-Windows-Cloud.apk.sha256
+          echo "APK SHA-256: $(cut -d ' ' -f 1 NOVA-Windows-Cloud.apk.sha256)"
+
+      - name: Cleanup signing material
+        if: ${{ always() }}
+        run: |
+          rm -f \
+            "$RUNNER_TEMP/nova-release.jks" \
+            "$RUNNER_TEMP/nova-release-certificate.txt" \
+            "$RUNNER_TEMP/nova-keytool-error.txt" \
+            "$RUNNER_TEMP/nova-release-manifest.txt" \
+            "$RUNNER_TEMP/nova-apksigner.txt"
 
       - name: Report build diagnostics
         if: ${{ always() }}
@@ -105,7 +236,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload APK artifact
+      - name: Upload signed APK artifact
+        if: ${{ success() && github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
           name: NOVA-Windows-Cloud-APK
@@ -116,9 +248,9 @@ jobs:
           retention-days: 30
 
       - name: Publish direct-download release
-        # Arena branch builds are downloadable as Actions artifacts; only main
-        # is allowed to move the stable apk-latest release tag.
-        if: ${{ success() && github.ref == 'refs/heads/main' }}
+        # Arena branch builds are Actions artifacts; only main can move the
+        # stable direct-download release after signature verification passes.
+        if: ${{ success() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
@@ -126,7 +258,7 @@ jobs:
           name: "NOVA Windows Cloud — latest APK"
           body: |
             Direct download: **NOVA-Windows-Cloud.apk** below.
-            Built and tested automatically from commit `${{ github.sha }}` on main.
+            Built, tested, and signature-verified from commit `${{ github.sha }}` on main.
             SHA-256 checksum: **NOVA-Windows-Cloud.apk.sha256**.
           files: |
             NOVA-Windows-Cloud.apk

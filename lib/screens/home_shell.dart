@@ -756,13 +756,15 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
 
   Widget _buildLatestBackupCard(BuildContext context, AppState st, L10n t) {
     final backup = st.latestCompleteBackup;
-    final backupState = st.backupsError != null
-        ? t.t('backups_load_failed')
-        : st.backupsBusy || st.backupsList == null
-            ? t.t('loading_backups')
-            : backup == null
-                ? (st.backupsList!.isEmpty ? t.t('no_backups') : t.t('backup_incomplete'))
-                : '${_fmtSize(backup.totalBytes)} · ${_fmtDate(backup.createdAt)}';
+    final backupState = st.selectedRepo == null
+        ? t.t('no_repo_selected')
+        : st.backupsError != null
+            ? t.t('backups_load_failed')
+            : st.backupsBusy || st.backupsList == null
+                ? t.t('loading_backups')
+                : backup == null
+                    ? (st.backupsList!.isEmpty ? t.t('no_backups') : t.t('backup_incomplete'))
+                    : '${_fmtSize(backup.totalBytes)} · ${_fmtDate(backup.createdAt)}';
 
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),

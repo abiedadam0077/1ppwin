@@ -1,5 +1,3 @@
-import 'dart:ui' show BlurStyle, MaskFilter;
-
 import 'package:flutter/material.dart';
 
 import 'theme.dart';

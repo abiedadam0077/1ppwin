@@ -12,6 +12,7 @@ on:
       - "pubspec.lock"
       - "analysis_options.yaml"
       - ".github/workflows/build-apk.yml"
+      - ".github/workflows/windows11.yml"
       - ".github/scripts/**"
   pull_request:
     branches: [main]
@@ -24,6 +25,7 @@ on:
       - "pubspec.lock"
       - "analysis_options.yaml"
       - ".github/workflows/build-apk.yml"
+      - ".github/workflows/windows11.yml"
       - ".github/scripts/**"
   workflow_dispatch:
 

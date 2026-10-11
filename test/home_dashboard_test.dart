@@ -6,9 +6,11 @@ import 'package:nova_windows_cloud/state/app_state.dart';
 
 void main() {
   testWidgets('home shows an honest empty backup state before repo selection', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 1000));
     final state = AppState();
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
+      await tester.binding.setSurfaceSize(null);
       state.dispose();
     });
 
@@ -18,7 +20,7 @@ void main() {
         child: const MaterialApp(
           locale: Locale('ar'),
           supportedLocales: [Locale('ar'), Locale('en'), Locale('fr')],
-          home: HomeShell(),
+          home: HomeFlowScreen(),
         ),
       ),
     );

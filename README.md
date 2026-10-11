@@ -98,11 +98,19 @@
 تدخل بـ GitHub، تختار الريبو، كتب الأسرار فالابليكاسيون وكتضاف بوحدها لـ GitHub Secrets،
 تشغّل الويندوز، تتابع المراحل، وتشوف رابط الجلسة وTailscale — كلشي من الهاتف.
 
+### تسجيل الدخول
+- **Device Flow** (RFC 8628) هو الافتراضي: بلا Client Secret، بلا redirect، بلا deep link.
+  التطبيق كيعطيك كود من 8 أحرف → كتحل `github.com/login/device` → كتأكدو → التطبيق كيتسجل بوحدو.
+- **خيار متقدم:** الدخول عبر المتصفح (web flow + PKCE). GitHub كيطلب فهاد الحالة
+  الـ **client secret** ديال الـ GitHub App (PKCE بوحدو ما كافياش عند GitHub)،
+  وكتقدر تلصقو من «إعدادات متقدمة» — كيتخزن غير فـ Keystore ديال الهاتف، عمرو ما كيدخل فـ الـ APK.
+- التطبيق كيطلب `offline_access` → التوكن 8 سوايع + **refresh token** 6 شهور كيتجدد بوحدو،
+  (توكن الـ device flow كيتجدد بلا client secret).
+
 ### الأمان فال تطبيق
-- **GitHub App + PKCE** (بلا Client Secret داخل الـ APK).
 - الأسرار كتشفرو فالهاتف بـ **crypto_box_seal** (X25519 + XSalsa20-Poly1305 + Blake2b)
   قبل ما يتبعتو لـ GitHub API — نفس الطريقة الرسمية ديال GitHub.
-- التوكن كيتخزن غير فـ **Android Keystore** (flutter_secure_storage).
+- التوكن + refresh token كيتخزنو غير فـ **Android Keystore** (flutter_secure_storage).
 
 ### بناء الـ APK
 كيتم أوتوماتيكيا مع كل push لـ `main` عبر `.github/workflows/build-apk.yml`:
@@ -112,7 +120,8 @@
 
 ### الإعداد (مرة وحدة)
 1. فصّفحة الـ GitHub App ديالك، تأكد بلي الـ Callback URL هو:
-   `novawindowscloud://oauth/callback`
+   `novawindowscloud://oauth/callback`، وبلي **Device Flow → Enable device flow** مشعّل
+   (هو اللي كيخلي التسجيل بالكود يخدم — وهو الافتراضي فالتطبيق).
 2. الصلاحيات المطلوبة فالـ GitHub App:
    Actions (R/W)، Secrets (R/W)، Contents (R/W)، Administration (R/W اختياري لإنشاء ريبو)، Profile (R).
 3. ثبّت الـ App على الريبو ديالك (Install App).

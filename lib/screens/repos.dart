@@ -6,7 +6,6 @@ import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../services/github_service.dart';
 import '../state/app_state.dart';
-import 'security.dart';
 import 'session.dart';
 
 class RepoSelectorScreen extends StatefulWidget {

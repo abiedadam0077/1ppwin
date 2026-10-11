@@ -10,7 +10,6 @@ import '../state/app_state.dart';
 import 'backups.dart';
 import 'more.dart';
 import 'repos.dart';
-import 'security.dart';
 import 'session.dart';
 
 class HomeShell extends StatelessWidget {

@@ -226,7 +226,7 @@ class _NovaBannerAdSlotState extends State<NovaBannerAdSlot> {
         request: const AdRequest(),
         listener: BannerAdListener(
           onAdLoaded: (ad) {
-            if (!mounted) {
+            if (!mounted || ad is! BannerAd) {
               ad.dispose();
               return;
             }

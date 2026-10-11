@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:nova_windows_cloud/screens/home_shell.dart';
@@ -19,6 +20,11 @@ void main() {
         value: state,
         child: const MaterialApp(
           locale: Locale('ar'),
+          localizationsDelegates: [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           supportedLocales: [Locale('ar'), Locale('en'), Locale('fr')],
           home: HomeFlowScreen(),
         ),

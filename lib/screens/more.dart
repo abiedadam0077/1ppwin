@@ -88,10 +88,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                     ChoiceChip(
                       label: Text(f[1], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                       selected: _filter == f[0],
-                      selectedColor: NovaTheme.neonPurple,
+                      selectedColor: NovaTheme.neonBlue,
                       backgroundColor: NovaTheme.card,
                       side: BorderSide(
-                        color: _filter == f[0] ? NovaTheme.neonPurpleSoft : NovaTheme.cardBorder,
+                        color: _filter == f[0] ? NovaTheme.neonBlue : NovaTheme.cardBorder,
                       ),
                       labelStyle: TextStyle(
                         color: _filter == f[0] ? Colors.white : NovaTheme.textDim,
@@ -314,7 +314,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       value: l[0],
                       groupValue: st.lang,
-                      activeColor: NovaTheme.neonPurpleSoft,
+                      activeColor: NovaTheme.neonBlue,
                       onChanged: (v) => st.setLang(v!),
                     ),
                 ],

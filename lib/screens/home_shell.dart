@@ -171,6 +171,8 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
     final t = L10n.of(context);
     final st = context.watch<AppState>();
     final login = st.user?['login'] as String? ?? '';
+    final rawName = st.user?['name'] as String? ?? '';
+    final displayName = rawName.trim().isNotEmpty ? rawName.trim() : login;
     final avatar = st.user?['avatar_url'] as String?;
 
     return GlowBackground(
@@ -191,17 +193,6 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
             ),
           ),
           actions: [
-            if (login.isNotEmpty)
-              IconButton(
-                tooltip: login,
-                onPressed: () => st.setTab(4),
-                icon: CircleAvatar(
-                  radius: 13,
-                  backgroundColor: NovaTheme.bg2,
-                  backgroundImage: avatar != null ? NetworkImage(avatar) : null,
-                  child: avatar == null ? const Icon(Icons.person, size: 15, color: NovaTheme.textDim) : null,
-                ),
-              ),
             IconButton(
               tooltip: t.t('refresh'),
               icon: const Icon(Icons.refresh, color: NovaTheme.neonCyan),
@@ -223,6 +214,16 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
             children: [
+              if (login.isNotEmpty) ...[
+                _buildProfileGreeting(
+                  t: t,
+                  name: displayName,
+                  login: login,
+                  avatar: avatar,
+                  onTap: () => st.setTab(4),
+                ),
+                const SizedBox(height: 14),
+              ],
               // 1. HERO WINDOWS 11 STATUS PANEL
               _buildWindowsHeroCard(context, st, t),
               const SizedBox(height: 14),
@@ -255,6 +256,78 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
               _buildShortcutsGrid(context, st, t),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileGreeting({
+    required L10n t,
+    required String name,
+    required String login,
+    required String? avatar,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: NovaTheme.btnGradient,
+                boxShadow: [
+                  BoxShadow(
+                    color: NovaTheme.neonBlue.withOpacity(0.38),
+                    blurRadius: 16,
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: NovaTheme.bg2,
+                backgroundImage: avatar != null ? NetworkImage(avatar) : null,
+                child: avatar == null ? const Icon(Icons.person, color: NovaTheme.textDim) : null,
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${t.t('welcome')} $name',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: NovaTheme.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text(
+                      '@$login',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: NovaTheme.textDim,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_left_rounded, color: NovaTheme.neonBlue, size: 23),
+          ],
         ),
       ),
     );
@@ -369,9 +442,15 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                           height: 42,
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.78),
+                            gradient: NovaTheme.btnGradient,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withOpacity(0.7)),
+                            border: Border.all(color: NovaTheme.neonCyan.withOpacity(0.75)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: NovaTheme.neonBlue.withOpacity(0.45),
+                                blurRadius: 16,
+                              ),
+                            ],
                           ),
                           child: const WindowsMark(size: 26),
                         ),
@@ -429,8 +508,25 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (remaining != null)
-                    _infoLine(Icons.timer_outlined, t.t('time_left'), remaining),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _sessionMetric(
+                          Icons.timer_outlined,
+                          t.t('time_left'),
+                          remaining ?? '—',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _sessionMetric(
+                          Icons.lock_outline_rounded,
+                          t.t('duration'),
+                          '${st.dispatchedHours} ${t.t('hours')}',
+                        ),
+                      ),
+                    ],
+                  ),
                   if (st.sessionInfo?.webUrl != null && st.sessionInfo!.webUrl!.isNotEmpty)
                     _infoLine(Icons.public, t.t('web_link'), st.sessionInfo!.webUrl!),
                   if (st.sessionInfo?.tailscaleIp != null && st.sessionInfo!.tailscaleIp!.isNotEmpty)
@@ -500,6 +596,44 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
       ),
     );
   }
+
+  Widget _sessionMetric(IconData icon, String label, String value) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+        decoration: BoxDecoration(
+          color: NovaTheme.bg2.withOpacity(0.82),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: NovaTheme.neonBlue.withOpacity(0.34)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: NovaTheme.neonCyan, size: 17),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: NovaTheme.textDim, fontSize: 9.5),
+                  ),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: NovaTheme.text,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _infoLine(IconData icon, String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),

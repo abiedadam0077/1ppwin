@@ -106,6 +106,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final device = st.deviceCode;
 
     return GlowBackground(
+      stars: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Center(
@@ -138,7 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: st.lang == l[0] ? NovaTheme.neonPurple : Colors.transparent,
+                                color: st.lang == l[0] ? NovaTheme.neonBlue : Colors.transparent,
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Text(
@@ -156,29 +157,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  width: 104,
-                  height: 104,
-                  padding: const EdgeInsets.all(23),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: NovaTheme.cardBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: NovaTheme.neonBlue.withOpacity(0.12),
-                        blurRadius: 22,
-                        offset: const Offset(0, 7),
-                      ),
-                    ],
-                  ),
-                  child: const WindowsMark(size: 56),
-                ),
+                const WindowsCloudLogo(size: 165),
                 const SizedBox(height: 10),
                 const Text(
                   'NOVA',
                   style: TextStyle(
-                    color: NovaTheme.text,
+                    color: NovaTheme.neonCyan,
                     fontSize: 34,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 4.5,
@@ -328,7 +312,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: SelectableText(
                 userCode,
                 style: const TextStyle(
-                  color: NovaTheme.text,
+                  color: Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 4,
@@ -506,6 +490,7 @@ class LoginSuccessScreen extends StatelessWidget {
     final avatar = st.user?['avatar_url'] as String?;
 
     return GlowBackground(
+      stars: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Center(
@@ -561,7 +546,7 @@ class LoginSuccessScreen extends StatelessWidget {
                 Text(
                   '${t.t('welcome')} ${name.isNotEmpty ? name : login}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: NovaTheme.text, fontSize: 22, fontWeight: FontWeight.w800),
+                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 22),
                 GlassCard(

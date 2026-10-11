@@ -164,10 +164,10 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                       child: ChoiceChip(
                         label: Text(t.t(f), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                         selected: _filter == f,
-                        selectedColor: NovaTheme.neonPurple,
+                        selectedColor: NovaTheme.neonBlue,
                         backgroundColor: NovaTheme.card,
                         side: BorderSide(
-                          color: _filter == f ? NovaTheme.neonPurpleSoft : NovaTheme.cardBorder,
+                          color: _filter == f ? NovaTheme.neonBlue : NovaTheme.cardBorder,
                         ),
                         labelStyle: TextStyle(
                           color: _filter == f ? Colors.white : NovaTheme.textDim,

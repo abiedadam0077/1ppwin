@@ -1075,8 +1075,6 @@ class _ReadyScreenState extends State<ReadyScreen> {
                 v,
                 textDirection: ltr ? TextDirection.ltr : null,
                 textAlign: ltr ? TextAlign.left : TextAlign.start,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: NovaTheme.text,
                   fontSize: 13,

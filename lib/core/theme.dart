@@ -54,9 +54,14 @@ class NovaTheme {
       bodyColor: text,
       displayColor: text,
     );
+    final primaryTextTheme = base.primaryTextTheme.apply(
+      fontFamily: fontFamilyName,
+      bodyColor: text,
+      displayColor: text,
+    );
 
     return base.copyWith(
-      fontFamily: fontFamilyName,
+      primaryTextTheme: primaryTextTheme,
       scaffoldBackgroundColor: bg,
       colorScheme: const ColorScheme.dark(
         primary: neonBlue,

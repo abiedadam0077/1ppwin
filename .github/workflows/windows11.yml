@@ -2,12 +2,13 @@ name: Windows 11 Pro
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Windows 11 Pro (dockur/windows) on a GitHub Actions runner.
-#  - Start it manually from the "Actions" tab → "Windows 11 Pro" → "Run workflow".
+#  - Start it manually from the "Actions" tab → "Windows 11 Pro" → "Run workflow"
+#    or directly from the NOVA Windows Cloud mobile app.
 #  - It runs for up to ~5.3 hours (GitHub's hard limit is 6h; the remaining
 #    time is reserved for a clean shutdown + saving the disk).
-#  - When time is up (or you shut Windows down yourself), Windows is stopped
-#    cleanly and the WHOLE disk (files, wallpaper, apps, settings…) is saved
-#    as an ENCRYPTED backup in this repo's Releases.
+#  - When time is up (or you shut Windows down yourself, or tap Stop & Save in
+#    the NOVA app), Windows is stopped cleanly and the WHOLE disk (files,
+#    wallpaper, apps, settings…) is saved as an ENCRYPTED backup in Releases.
 #  - Next time you start it, the latest backup is restored → Windows is
 #    exactly as you left it.
 #
@@ -247,6 +248,10 @@ jobs:
         env:
           TS_KEY: ${{ secrets.TAILSCALE_AUTHKEY }}
         run: |
+          if [ -z "$TS_KEY" ]; then
+            echo "TAILSCALE_AUTHKEY is not set → skipping RDP setup."
+            exit 0
+          fi
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey "$TS_KEY" --hostname "win11-github" --accept-routes=false
           TS_IP=$(tailscale ip -4)
@@ -264,6 +269,22 @@ jobs:
           echo " Password          : (your ACCESS_PASSWORD secret)"
           echo "=============================================================="
 
+      - name: Publish session info for the mobile app
+        run: |
+          mkdir -p "$WORK/session-info"
+          {
+            echo "WEB_URL=${WEB_URL:-}"
+            echo "TS_IP=${TS_IP:-}"
+            echo "WIN_USER=${WIN_USER:-Docker}"
+          } > "$WORK/session-info/info.txt"
+
+      - name: Upload session info artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-info
+          path: /win-work/session-info/
+          retention-days: 1
+
       - name: Windows is running (open the link in the step above)
         env:
           HOURS: ${{ inputs.hours }}
@@ -275,7 +296,7 @@ jobs:
           END=$(( NOW + WANT_SEC ))
           [ "$END" -gt "$HARD_END" ] && END=$HARD_END
           echo "Session ends at: $(date -u -d @"$END" '+%H:%M UTC')"
-          echo "Tip: to stop early AND save, just shut Windows down from the Start menu."
+          echo "Tip: to stop early AND save, just shut Windows down from the Start menu or tap Stop & Save in the NOVA app."
 
           last_print=0
           while true; do
@@ -284,13 +305,18 @@ jobs:
               echo "Windows was shut down → saving."
               break
             fi
+            if gh release view "nova-stop-${GITHUB_RUN_ID}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Stop & Save requested from NOVA app → shutting Windows down cleanly and saving."
+              gh release delete "nova-stop-${GITHUB_RUN_ID}" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y >/dev/null 2>&1 || true
+              break
+            fi
             if [ "$NOW" -ge "$END" ]; then
               echo "Time is up → shutting Windows down and saving."
               break
             fi
             if [ $(( NOW - last_print )) -ge 600 ]; then
               LEFT=$(( (END - NOW) / 60 ))
-              echo "[$(date -u '+%H:%M')] Running – ${LEFT} min left | Web: ${WEB_URL} ${TS_IP:+| RDP: ${TS_IP}:3389}"
+              echo "[$(date -u '+%H:%M')] Running – ${LEFT} min left | Web: ${WEB_URL:-} ${TS_IP:+| RDP: ${TS_IP}:3389}"
               last_print=$NOW
             fi
             sleep 20

@@ -441,7 +441,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           child: CircularProgressIndicator(
                             value: _stepProgress,
                             strokeWidth: 8,
-                            backgroundColor: NovaTheme.cardElevated.withOpacity(0.78),
+                            backgroundColor: NovaTheme.bg3,
                             valueColor: AlwaysStoppedAnimation<Color>(
                               _isRunFailed ? NovaTheme.danger : NovaTheme.neonCyan,
                             ),
@@ -830,65 +830,64 @@ class _ReadyScreenState extends State<ReadyScreen> {
                       fit: BoxFit.cover,
                       alignment: Alignment.center,
                     ),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.12),
-                            const Color(0xD9050A1B),
-                          ],
-                        ),
-                      ),
-                    ),
                     PositionedDirectional(
                       start: 16,
                       end: 16,
                       bottom: 15,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            padding: const EdgeInsets.all(9),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: Colors.white.withOpacity(0.24)),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.94),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.white),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x1F19304D), blurRadius: 12, offset: Offset(0, 4)),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: NovaTheme.bg2,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: NovaTheme.cardBorder),
+                              ),
+                              child: const WindowsMark(size: 26),
                             ),
-                            child: const WindowsMark(size: 30),
-                          ),
-                          const SizedBox(width: 11),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'Windows 11 Pro',
-                                  textDirection: TextDirection.ltr,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w900,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    'Windows 11 Pro',
+                                    textDirection: TextDirection.ltr,
+                                    style: TextStyle(
+                                      color: NovaTheme.text,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  st.selectedRepo?.fullName ?? 'NOVA Windows Cloud',
-                                  textDirection: TextDirection.ltr,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Color(0xFFD5E6FF),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
+                                  Text(
+                                    st.selectedRepo?.fullName ?? 'NOVA Windows Cloud',
+                                    textDirection: TextDirection.ltr,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: NovaTheme.textDim,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],

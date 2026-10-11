@@ -1,10 +1,10 @@
-import 'dart:ui';
+import 'dart:ui' show BlurStyle, MaskFilter;
 
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// Frosted dark Glassmorphism card with luminous neon border.
+/// Light, softly elevated surface used across the NOVA screens.
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -19,7 +19,7 @@ class GlassCard extends StatelessWidget {
     this.padding,
     this.borderColor,
     this.glowColor,
-    this.radius = 20,
+    this.radius = 18,
     this.onTap,
   });
 
@@ -31,21 +31,25 @@ class GlassCard extends StatelessWidget {
     Widget content = AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
-      padding: padding ?? const EdgeInsets.all(18),
+      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
         gradient: NovaTheme.cardGradient,
-        border: Border.all(
-          color: effectiveBorder,
-          width: 1.1,
-        ),
+        border: Border.all(color: effectiveBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: effectiveGlow.withOpacity(0.12),
-            blurRadius: 20,
+            color: const Color(0xFF142644).withOpacity(0.055),
+            blurRadius: 16,
             spreadRadius: 0,
             offset: const Offset(0, 5),
           ),
+          if (glowColor != null)
+            BoxShadow(
+              color: effectiveGlow.withOpacity(0.06),
+              blurRadius: 20,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
         ],
       ),
       child: child,
@@ -62,13 +66,7 @@ class GlassCard extends StatelessWidget {
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: content,
-      ),
-    );
+    return content;
   }
 }
 
@@ -91,15 +89,9 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
+        color: color.withOpacity(0.09),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.56), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.14),
-            blurRadius: 8,
-          ),
-        ],
+        border: Border.all(color: color.withOpacity(0.22), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -164,19 +156,14 @@ class GradientButton extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: enabled ? (gradient ?? NovaTheme.btnGradient) : null,
-        color: enabled ? null : NovaTheme.cardElevated.withOpacity(0.65),
-        border: enabled ? null : Border.all(color: NovaTheme.cardBorder.withOpacity(0.4)),
+        color: enabled ? null : NovaTheme.bg3,
+        border: enabled ? null : Border.all(color: NovaTheme.cardBorder),
         boxShadow: enabled
             ? [
                 BoxShadow(
-                  color: NovaTheme.neonBlue.withOpacity(0.42),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-                BoxShadow(
-                  color: NovaTheme.neonPurple.withOpacity(0.25),
-                  blurRadius: 24,
-                  offset: const Offset(0, 2),
+                  color: NovaTheme.neonBlue.withOpacity(0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ]
             : null,
@@ -493,9 +480,9 @@ class GlowBackground extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(0xFF050A1C),
-                Color(0xFF07132B),
-                Color(0xFF04091A),
+                Color(0xFFF8F9FC),
+                Color(0xFFF0F2F7),
+                Color(0xFFF7F8FB),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -530,7 +517,7 @@ class GlowBackground extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              colors: [c.withOpacity(0.19), c.withOpacity(0.0)],
+              colors: [c.withOpacity(0.055), c.withOpacity(0.0)],
             ),
           ),
         ),
@@ -559,9 +546,9 @@ class _NovaAuroraPainter extends CustomPainter {
     }
 
     const colors = [
-      Color(0x343E8EFF),
-      Color(0x2E35B8F5),
-      Color(0x267B62FF),
+      Color(0x193E8EFF),
+      Color(0x1635B8F5),
+      Color(0x127B62FF),
     ];
     for (var i = 0; i < colors.length; i++) {
       final baseY = size.height * (0.79 + i * 0.045);
@@ -615,9 +602,9 @@ class _NovaAuroraPainter extends CustomPainter {
       bloom,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 12
+        ..strokeWidth = 9
         ..strokeCap = StrokeCap.round
-        ..color = NovaTheme.neonBlue.withOpacity(0.12)
+        ..color = NovaTheme.neonBlue.withOpacity(0.04)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
     );
   }
@@ -688,7 +675,7 @@ class NovaBrandLockup extends StatelessWidget {
               Text(
                 'NOVA',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: NovaTheme.text,
                   fontSize: compact ? 15 : 24,
                   fontWeight: FontWeight.w900,
                   letterSpacing: compact ? 2.1 : 3.2,
@@ -698,7 +685,7 @@ class NovaBrandLockup extends StatelessWidget {
               Text(
                 'Windows Cloud',
                 style: TextStyle(
-                  color: NovaTheme.neonCyan,
+                  color: NovaTheme.neonBlue,
                   fontSize: compact ? 9.5 : 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: compact ? 0.2 : 0.7,
@@ -740,30 +727,31 @@ class NovaBottomNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xF20D1833), Color(0xFF070D20)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        border: Border(top: BorderSide(color: NovaTheme.cardBorder.withOpacity(0.85))),
-        boxShadow: [
+        color: NovaTheme.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: NovaTheme.cardBorder),
+        boxShadow: const [
           BoxShadow(
-            color: NovaTheme.neonPurple.withOpacity(0.16),
-            blurRadius: 22,
-            offset: const Offset(0, -5),
+            color: Color(0x140E2344),
+            blurRadius: 16,
+            offset: Offset(0, 5),
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 66,
-          child: Row(
-            children: [
-              for (var index = 0; index < items.length; index++)
-                Expanded(child: _item(items[index], index)),
-            ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 62,
+            child: Row(
+              children: [
+                for (var index = 0; index < items.length; index++)
+                  Expanded(child: _item(items[index], index)),
+              ],
+            ),
           ),
         ),
       ),
@@ -772,40 +760,24 @@ class NovaBottomNavigationBar extends StatelessWidget {
 
   Widget _item(NovaNavigationItem item, int index) {
     final selected = selectedIndex == index;
-    final accent = NovaTheme.neonPurpleSoft;
     return Semantics(
       button: true,
       selected: selected,
       label: item.label.replaceAll('\n', ' '),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(17),
+            borderRadius: BorderRadius.circular(14),
             onTap: () => onSelected(index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 3),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: selected
-                    ? LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          accent.withOpacity(0.22),
-                          NovaTheme.neonPurple.withOpacity(0.08),
-                        ],
-                      )
-                    : null,
-                border: Border.all(
-                  color: selected ? accent.withOpacity(0.5) : Colors.transparent,
-                ),
-                boxShadow: selected
-                    ? [BoxShadow(color: NovaTheme.neonPurple.withOpacity(0.16), blurRadius: 12)]
-                    : null,
+                borderRadius: BorderRadius.circular(14),
+                color: selected ? NovaTheme.neonPurple.withOpacity(0.08) : Colors.transparent,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -813,19 +785,19 @@ class NovaBottomNavigationBar extends StatelessWidget {
                 children: [
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    width: 35,
-                    height: 25,
+                    width: 34,
+                    height: 24,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: selected ? accent.withOpacity(0.2) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9),
+                      color: selected ? NovaTheme.neonPurple.withOpacity(0.12) : Colors.transparent,
                     ),
                     child: Icon(
                       selected ? item.selectedIcon : item.icon,
-                      size: selected ? 20 : 19,
-                      color: selected ? Colors.white : NovaTheme.textDim,
+                      size: selected ? 19 : 18,
+                      color: selected ? NovaTheme.neonPurple : NovaTheme.textMuted,
                     ),
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text(
                     item.label,
                     maxLines: 2,
@@ -833,7 +805,7 @@ class NovaBottomNavigationBar extends StatelessWidget {
                     softWrap: true,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: selected ? Colors.white : NovaTheme.textDim,
+                      color: selected ? NovaTheme.neonPurple : NovaTheme.textDim,
                       fontSize: 8.5,
                       height: 1.02,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w600,

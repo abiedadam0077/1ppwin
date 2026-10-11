@@ -177,7 +177,19 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: const NovaBrandLockup(compact: true, logoSize: 43),
+          title: Text(t.t('home')),
+          leading: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: NovaTheme.card,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: NovaTheme.cardBorder),
+              ),
+              child: const WindowsMark(size: 20),
+            ),
+          ),
           actions: [
             if (login.isNotEmpty)
               IconButton(
@@ -324,33 +336,85 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Center(child: WindowsCloudLogo(size: 135)),
-          const SizedBox(height: 10),
-          const Center(
-            child: Text(
-              'Windows 11 Pro Cloud VM',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              height: 156,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/nova_windows_bloom.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xB3132E55)],
+                      ),
+                    ),
+                  ),
+                  PositionedDirectional(
+                    start: 13,
+                    end: 13,
+                    bottom: 11,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.78),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withOpacity(0.7)),
+                          ),
+                          child: const WindowsMark(size: 26),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Windows 11 Pro',
+                                textDirection: TextDirection.ltr,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  shadows: [Shadow(color: Color(0x66000000), blurRadius: 8)],
+                                ),
+                              ),
+                              if (st.selectedRepo != null)
+                                Directionality(
+                                  textDirection: TextDirection.ltr,
+                                  child: Text(
+                                    st.selectedRepo!.fullName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFFF0F5FF),
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          if (st.selectedRepo != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Center(
-                child: Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Text(
-                    st.selectedRepo!.fullName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: NovaTheme.neonCyan, fontSize: 12.5, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ),
 
           // Verified real session metrics when a live run is active
           if (isLive) ...[
@@ -510,7 +574,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                           repo.fullName,
                           textAlign: TextAlign.left,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: NovaTheme.text,
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
                           ),

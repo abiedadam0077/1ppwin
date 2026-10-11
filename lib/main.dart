@@ -158,7 +158,17 @@ class _StartupScreen extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const WindowsCloudLogo(size: 138),
+                        Container(
+                          width: 88,
+                          height: 88,
+                          padding: const EdgeInsets.all(17),
+                          decoration: BoxDecoration(
+                            color: NovaTheme.card,
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(color: NovaTheme.cardBorder),
+                          ),
+                          child: const WindowsMark(size: 54),
+                        ),
                         const SizedBox(height: 5),
                         const Directionality(
                           textDirection: TextDirection.ltr,
@@ -167,7 +177,7 @@ class _StartupScreen extends StatelessWidget {
                               Text(
                                 'NOVA',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: NovaTheme.text,
                                   fontSize: 30,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 4,
@@ -176,7 +186,7 @@ class _StartupScreen extends StatelessWidget {
                               Text(
                                 'Windows Cloud',
                                 style: TextStyle(
-                                  color: NovaTheme.neonCyan,
+                                  color: NovaTheme.neonBlue,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1,

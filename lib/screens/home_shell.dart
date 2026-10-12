@@ -125,6 +125,41 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
   }
 
   Future<void> _installOrRepairWorkflow(AppState st, L10n t) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.account_tree_outlined, color: NovaTheme.warn),
+        title: Text(t.t('workflow_confirm_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.t('workflow_confirm_body')),
+            const SizedBox(height: 10),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: SelectableText(
+                st.selectedRepo?.fullName ?? '',
+                textAlign: TextAlign.left,
+                style: const TextStyle(color: NovaTheme.neonCyan, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.cloud_upload_outlined),
+            label: Text(t.t('workflow_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _setupBusy = true);
     try {
       await st.installOrRepairWorkflow();
@@ -176,6 +211,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
     final avatar = st.user?['avatar_url'] as String?;
 
     return GlowBackground(
+      aurora: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -366,6 +402,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
     }
 
     return GlassCard(
+      aurora: true,
       borderColor: isLive ? NovaTheme.ok.withOpacity(0.75) : NovaTheme.cardBorderBright.withOpacity(0.55),
       glowColor: isLive ? NovaTheme.ok : NovaTheme.neonPurple,
       padding: const EdgeInsets.all(14),

@@ -776,7 +776,29 @@ class LoginSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 TextButton.icon(
-                  onPressed: () => context.read<AppState>().logout(),
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (dialogContext) => AlertDialog(
+                        icon: const Icon(Icons.logout_rounded, color: NovaTheme.warn),
+                        title: Text(t.t('logout_confirm_title')),
+                        content: Text(t.t('logout_confirm_body')),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext, false),
+                            child: Text(t.t('cancel')),
+                          ),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(backgroundColor: NovaTheme.danger),
+                            onPressed: () => Navigator.pop(dialogContext, true),
+                            icon: const Icon(Icons.logout_rounded),
+                            label: Text(t.t('logout_confirm_action')),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && context.mounted) await context.read<AppState>().logout();
+                  },
                   icon: const Icon(Icons.logout, size: 16, color: NovaTheme.textDim),
                   label: Text(t.t('logout'), style: const TextStyle(color: NovaTheme.textDim)),
                 ),

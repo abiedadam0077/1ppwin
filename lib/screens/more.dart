@@ -48,6 +48,80 @@ class _ActivityScreenState extends State<ActivityScreen> {
       '${t.year.toString().padLeft(4, '0')}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
 
+  void _showActivityDetails(BuildContext context, L10n t, ActivityEntry entry) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          _iconForType(entry.type),
+          color: entry.ok ? NovaTheme.ok : NovaTheme.danger,
+        ),
+        title: Text(t.t(entry.type)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (entry.detail.isNotEmpty) ...[
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: SelectableText(
+                  entry.detail,
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(color: NovaTheme.text, fontSize: 13, height: 1.45),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Text(
+                _fmtTime(entry.time),
+                textAlign: TextAlign.left,
+                style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            StatusBadge(
+              label: entry.ok ? t.t('status_success') : t.t('status_failed'),
+              color: entry.ok ? NovaTheme.ok : NovaTheme.danger,
+              icon: entry.ok ? Icons.check_circle_outline : Icons.error_outline,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(t.t('cancel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmClearActivity(BuildContext context, AppState st, L10n t) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.delete_sweep_outlined, color: NovaTheme.warn),
+        title: Text(t.t('clear_activity_confirm_title')),
+        content: Text(t.t('clear_activity_confirm_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: NovaTheme.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: Text(t.t('clear_activity_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await st.clearActivity();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = L10n.of(context);
@@ -68,7 +142,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               IconButton(
                 tooltip: t.t('clear_activity'),
                 icon: const Icon(Icons.delete_sweep_outlined, color: NovaTheme.textDim),
-                onPressed: () => st.clearActivity(),
+                onPressed: () => _confirmClearActivity(context, st, t),
               ),
           ],
         ),
@@ -141,7 +215,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                         final title = t.t(e.type);
                         return GlassCard(
                           padding: const EdgeInsets.all(12),
-                          borderColor: color.withOpacity(0.45),
+                          onTap: () => _showActivityDetails(context, t, e),
+                          borderColor: NovaTheme.cardBorder,
                           glowColor: color,
                           child: Row(
                             children: [
@@ -436,12 +511,36 @@ class SettingsScreen extends StatelessWidget {
               label: t.t('logout'),
               icon: Icons.logout_rounded,
               color: NovaTheme.danger,
-              onPressed: () => st.logout(),
+              onPressed: () => _confirmLogout(context, st, t),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context, AppState st, L10n t) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.logout_rounded, color: NovaTheme.warn),
+        title: Text(t.t('logout_confirm_title')),
+        content: Text(t.t('logout_confirm_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: NovaTheme.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.logout_rounded),
+            label: Text(t.t('logout_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await st.logout();
   }
 
   Widget _settingsItem({

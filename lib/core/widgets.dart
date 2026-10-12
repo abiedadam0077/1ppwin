@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// Frosted dark Glassmorphism card with luminous neon border.
+/// Shared NOVA surface. Standard surfaces are solid and inexpensive to paint;
+/// use `aurora: true` only for the few high-emphasis hero panels.
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -12,6 +13,7 @@ class GlassCard extends StatelessWidget {
   final Color? glowColor;
   final double radius;
   final VoidCallback? onTap;
+  final bool aurora;
 
   const GlassCard({
     super.key,
@@ -19,61 +21,66 @@ class GlassCard extends StatelessWidget {
     this.padding,
     this.borderColor,
     this.glowColor,
-    this.radius = 20,
+    this.radius = NovaTheme.radiusLarge,
     this.onTap,
+    this.aurora = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final effectiveBorder = borderColor ?? NovaTheme.cardBorder;
-    final effectiveGlow = glowColor ?? NovaTheme.neonBlue;
-
-    Widget content = AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
+    final effectiveAccent = glowColor ?? NovaTheme.neonBlue;
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: padding ?? const EdgeInsets.all(18),
+      padding: padding ?? const EdgeInsets.all(NovaTheme.space16),
       decoration: BoxDecoration(
+        color: aurora ? null : NovaTheme.card,
+        gradient: aurora ? NovaTheme.cardGradient : null,
         borderRadius: BorderRadius.circular(radius),
-        gradient: NovaTheme.cardGradient,
-        border: Border.all(
-          color: effectiveBorder,
-          width: 1.1,
-        ),
+        border: Border.all(color: effectiveBorder, width: 1),
+        boxShadow: aurora
+            ? [
+                BoxShadow(
+                  color: effectiveAccent.withOpacity(0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+                const BoxShadow(
+                  color: Color(0x12000000),
+                  blurRadius: 18,
+                  offset: Offset(0, 5),
+                ),
+              ]
+            : null,
       ),
       child: child,
     );
 
-    if (onTap != null) {
-      content = Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(radius),
-          onTap: onTap,
+    Widget surface = content;
+    if (aurora) {
+      surface = ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
           child: content,
         ),
       );
     }
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: effectiveGlow.withOpacity(glowColor == null ? 0.12 : 0.22),
-            blurRadius: glowColor == null ? 18 : 24,
-            spreadRadius: glowColor == null ? 0 : 0.5,
-            offset: const Offset(0, 5),
+    if (onTap != null) {
+      surface = Semantics(
+        button: true,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(radius),
+            onTap: onTap,
+            child: surface,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: content,
         ),
-      ),
-    );
+      );
+    }
+    return surface;
   }
 }
 
@@ -93,50 +100,51 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.56), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.14),
-            blurRadius: 8,
+    return Semantics(
+      label: label,
+      liveRegion: pulsing,
+      child: ExcludeSemantics(
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 27),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withOpacity(0.42), width: 1),
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (pulsing)
-            SizedBox(
-              width: 10,
-              height: 10,
-              child: CircularProgressIndicator(strokeWidth: 1.7, color: color),
-            )
-          else if (icon != null)
-            Icon(icon, color: color, size: 12)
-          else
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (pulsing)
+                SizedBox(
+                  width: 11,
+                  height: 11,
+                  child: CircularProgressIndicator(strokeWidth: 1.8, color: color),
+                )
+              else if (icon != null)
+                Icon(icon, color: color, size: 14)
+              else
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -172,19 +180,14 @@ class GradientButton extends StatelessWidget {
         color: enabled ? null : NovaTheme.cardElevated.withOpacity(0.65),
         border: enabled ? null : Border.all(color: NovaTheme.cardBorder.withOpacity(0.4)),
         boxShadow: enabled
-            ? [
-                BoxShadow(
-                  color: NovaTheme.neonBlue.withOpacity(0.42),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-                BoxShadow(
-                  color: NovaTheme.neonPurple.withOpacity(0.25),
-                  blurRadius: 24,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
+          ? [
+              BoxShadow(
+                color: NovaTheme.neonBlue.withOpacity(0.16),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ]
+          : null,
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
@@ -216,8 +219,8 @@ class GradientButton extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: enabled ? Colors.white : NovaTheme.textMuted,
-                        fontSize: 14,
-                        height: 1.04,
+                  fontSize: 14.5,
+                  height: 1.15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -251,8 +254,8 @@ class SecondaryNeonButton extends StatelessWidget {
       height: 48,
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
-          backgroundColor: color.withOpacity(0.08),
-          side: BorderSide(color: color.withOpacity(0.65), width: 1.2),
+          backgroundColor: color.withOpacity(0.05),
+          side: BorderSide(color: color.withOpacity(0.48), width: 1),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
         ),
@@ -278,8 +281,8 @@ class SecondaryNeonButton extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: color,
-                        fontSize: 12.5,
-                        height: 1.05,
+                        fontSize: 13,
+                        height: 1.15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -394,9 +397,8 @@ class NeonField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: NovaTheme.bg2.withOpacity(0.85),
-        border: Border.all(color: NovaTheme.cardBorder, width: 1.1),
+        borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
+        color: NovaTheme.bg2,
       ),
       child: TextField(
         controller: controller,
@@ -406,15 +408,28 @@ class NeonField extends StatelessWidget {
         textAlign: TextAlign.start,
         keyboardType: keyboardType,
         textInputAction: textInputAction,
-        style: const TextStyle(color: NovaTheme.text, fontSize: 14),
+        cursorColor: NovaTheme.neonCyan,
+        style: const TextStyle(color: NovaTheme.text, fontSize: 14.5),
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          labelStyle: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5),
+          labelStyle: const TextStyle(color: NovaTheme.textDim, fontSize: 13),
           hintStyle: const TextStyle(color: NovaTheme.textMuted, fontSize: 12),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
             borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
+            borderSide: const BorderSide(color: NovaTheme.cardBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
+            borderSide: const BorderSide(color: NovaTheme.neonCyan, width: 1.5),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
+            borderSide: const BorderSide(color: NovaTheme.danger),
           ),
           prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: NovaTheme.neonBlue, size: 19) : null,
           suffixIcon: suffix,
@@ -486,8 +501,14 @@ class NeonSwitch extends StatelessWidget {
 class GlowBackground extends StatelessWidget {
   final Widget child;
   final bool stars;
+  final bool aurora;
 
-  const GlowBackground({super.key, required this.child, this.stars = false});
+  const GlowBackground({
+    super.key,
+    required this.child,
+    this.stars = false,
+    this.aurora = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -497,45 +518,36 @@ class GlowBackground extends StatelessWidget {
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFF050A1C),
-                Color(0xFF07132B),
-                Color(0xFF04091A),
-              ],
+              colors: [NovaTheme.bg, Color(0xFF0A1425), NovaTheme.bg],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
           ),
           child: SizedBox.expand(),
         ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: CustomPaint(painter: _NovaAuroraPainter(stars: stars)),
+        if (aurora || stars)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(painter: _NovaAuroraPainter(stars: stars)),
+            ),
           ),
-        ),
-        Positioned(
-          top: -150,
-          left: -140,
-          child: _glow(NovaTheme.neonPurple, 330),
-        ),
-        Positioned(
-          top: 110,
-          right: -180,
-          child: _glow(NovaTheme.neonBlue, 320),
-        ),
+        if (aurora) ...[
+          Positioned(top: -190, left: -175, child: _glow(NovaTheme.neonPurple, 340)),
+          Positioned(top: 95, right: -210, child: _glow(NovaTheme.neonBlue, 330)),
+        ],
         SafeArea(child: child),
       ],
     );
   }
 
-  Widget _glow(Color c, double size) => IgnorePointer(
+  Widget _glow(Color color, double size) => IgnorePointer(
         child: Container(
           width: size,
           height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              colors: [c.withOpacity(0.19), c.withOpacity(0.0)],
+              colors: [color.withOpacity(0.10), color.withOpacity(0.0)],
             ),
           ),
         ),
@@ -729,7 +741,7 @@ class NovaNavigationItem {
   });
 }
 
-/// Five-slot navigation bar sized specifically for compact Arabic layouts.
+/// Five-slot navigation with readable Arabic labels and a full-size tap area.
 class NovaBottomNavigationBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
@@ -745,25 +757,14 @@ class NovaBottomNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xF20D1833), Color(0xFF070D20)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        border: Border(top: BorderSide(color: NovaTheme.cardBorder.withOpacity(0.85))),
-        boxShadow: [
-          BoxShadow(
-            color: NovaTheme.neonPurple.withOpacity(0.16),
-            blurRadius: 22,
-            offset: const Offset(0, -5),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: NovaTheme.card,
+        border: Border(top: BorderSide(color: NovaTheme.cardBorder)),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 66,
+          height: 72,
           child: Row(
             children: [
               for (var index = 0; index < items.length; index++)
@@ -777,70 +778,69 @@ class NovaBottomNavigationBar extends StatelessWidget {
 
   Widget _item(NovaNavigationItem item, int index) {
     final selected = selectedIndex == index;
-    final accent = NovaTheme.neonPurpleSoft;
+    final label = item.label.replaceAll('\n', ' ');
     return Semantics(
       button: true,
       selected: selected,
-      label: item.label.replaceAll('\n', ' '),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(17),
-            onTap: () => onSelected(index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 3),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: selected ? NovaTheme.neonPurple.withOpacity(0.08) : Colors.transparent,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: selected ? NovaTheme.purpleGradient : null,
-                      color: selected ? null : Colors.transparent,
-                      border: selected ? Border.all(color: accent.withOpacity(0.8)) : null,
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: NovaTheme.neonPurple.withOpacity(0.55),
-                                blurRadius: 18,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Icon(
-                      selected ? item.selectedIcon : item.icon,
-                      size: selected ? 20 : 19,
-                      color: selected ? Colors.white : NovaTheme.textDim,
-                    ),
+      label: label,
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 3),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
+              onTap: () => onSelected(index),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: NovaTheme.minTouchTarget),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
+                    color: selected ? NovaTheme.neonBlue.withOpacity(0.10) : Colors.transparent,
+                    border: selected ? Border.all(color: NovaTheme.neonBlue.withOpacity(0.24)) : null,
                   ),
-                  const SizedBox(height: 1),
-                  Text(
-                    item.label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: true,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: selected ? NovaTheme.neonPurpleSoft : NovaTheme.textDim,
-                      fontSize: 8.5,
-                      height: 1.02,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                    ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final labelSize = constraints.maxWidth < 52
+                          ? 9.5
+                          : constraints.maxWidth < 68
+                              ? 11.5
+                              : 12.0;
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 30,
+                            height: 30,
+                            child: Icon(
+                              selected ? item.selectedIcon : item.icon,
+                              size: 20,
+                              color: selected ? NovaTheme.neonCyan : NovaTheme.textDim,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            item.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: selected ? NovaTheme.text : NovaTheme.textDim,
+                              fontSize: labelSize,
+                              height: 1.08,
+                              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -916,6 +916,70 @@ class NovaLoadingState extends StatelessWidget {
   }
 }
 
+class NovaErrorState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final Widget? action;
+  final TextDirection? subtitleDirection;
+
+  const NovaErrorState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.color = NovaTheme.danger,
+    this.action,
+    this.subtitleDirection,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: GlassCard(
+        borderColor: color.withOpacity(0.36),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(NovaTheme.radiusLarge),
+                border: Border.all(color: color.withOpacity(0.28)),
+              ),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: NovaTheme.text, fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Directionality(
+              textDirection: subtitleDirection ?? Directionality.of(context),
+              child: Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: NovaTheme.textDim, fontSize: 13, height: 1.5),
+              ),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 16),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class NovaEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -955,7 +1019,7 @@ class NovaEmptyState extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: NovaTheme.text,
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -963,7 +1027,7 @@ class NovaEmptyState extends StatelessWidget {
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.45),
+            style: const TextStyle(color: NovaTheme.textDim, fontSize: 13, height: 1.5),
           ),
           if (action != null) ...[
             const SizedBox(height: 16),

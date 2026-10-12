@@ -59,6 +59,7 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                     : t.t('backup_incomplete');
 
     return GlowBackground(
+      aurora: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: Text(t.t('session'))),
@@ -96,8 +97,9 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                         ),
                         const SizedBox(height: 12),
                         GlassCard(
+                          aurora: true,
                           padding: const EdgeInsets.all(14),
-                          borderColor: NovaTheme.neonBlue.withOpacity(0.55),
+                          borderColor: NovaTheme.neonBlue.withOpacity(0.38),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -389,6 +391,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Map<String, dynamic>? _run;
   String? _error;
   bool _repairing = false;
+  bool _cancelling = false;
   bool _navigatedToReady = false;
 
   static const _stageToStep = <String, List<String>>{
@@ -537,39 +540,37 @@ class _ProgressScreenState extends State<ProgressScreen> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Center(
+            GlassCard(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   SizedBox(
-                    width: 174,
-                    height: 174,
+                    width: 144,
+                    height: 144,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         Container(
-                          width: 128,
-                          height: 128,
+                          width: 112,
+                          height: 112,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [NovaTheme.neonBlue.withOpacity(0.18), NovaTheme.bg.withOpacity(0.02)],
+                            color: NovaTheme.bg2,
+                            border: Border.all(
+                              color: (_isRunFailed ? NovaTheme.danger : NovaTheme.neonBlue).withOpacity(0.20),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (_isRunFailed ? NovaTheme.danger : NovaTheme.neonBlue).withOpacity(0.20),
-                                blurRadius: 34,
-                                spreadRadius: 2,
-                              ),
-                            ],
                           ),
                         ),
                         SizedBox(
-                          width: 164,
-                          height: 164,
+                          width: 136,
+                          height: 136,
                           child: CircularProgressIndicator(
                             value: _stepProgress,
-                            strokeWidth: 8,
+                            semanticsLabel: t.t('workflow_progress'),
+                            semanticsValue: _stepProgress == null ? null : '${((_stepProgress ?? 0) * 100).round()}%',
+                            strokeWidth: 6,
                             backgroundColor: NovaTheme.cardElevated.withOpacity(0.78),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               _isRunFailed ? NovaTheme.danger : NovaTheme.neonCyan,
@@ -579,13 +580,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const WindowsMark(size: 34),
-                            const SizedBox(height: 7),
+                            const WindowsMark(size: 28),
+                            const SizedBox(height: 6),
                             Text(
                               _steps.isEmpty ? '—' : '${((_stepProgress ?? 0) * 100).round()}%',
                               style: const TextStyle(
                                 color: NovaTheme.text,
-                                fontSize: 23,
+                                fontSize: 21,
                                 height: 1,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -790,15 +791,51 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 label: t.t('cancel_run'),
                 icon: Icons.stop_circle_outlined,
                 color: NovaTheme.danger,
-                onPressed: () async {
-                  await context.read<AppState>().stopOrCancelCurrentRun(forceCancel: true);
-                  if (context.mounted) Navigator.of(context).maybePop();
-                },
+                busy: _cancelling,
+                onPressed: _cancelling ? null : () => _confirmImmediateCancel(context, t),
               ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmImmediateCancel(BuildContext context, L10n t) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded, color: NovaTheme.danger),
+        title: Text(t.t('cancel_run_confirm_title')),
+        content: Text(t.t('cancel_run_confirm_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: NovaTheme.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.stop_circle_outlined),
+            label: Text(t.t('force_cancel')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _cancelling = true);
+    try {
+      await context.read<AppState>().stopOrCancelCurrentRun(forceCancel: true);
+      if (context.mounted) Navigator.of(context).maybePop();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.t('error')}: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
   }
 
   Widget _stageRow(L10n t, List<String> stages, int i) {
@@ -931,6 +968,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
     final hasInMemoryPass = st.inMemoryAccessPassword != null && st.inMemoryAccessPassword!.isNotEmpty;
 
     return GlowBackground(
+      aurora: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -1056,7 +1094,8 @@ class _ReadyScreenState extends State<ReadyScreen> {
             ),
             const SizedBox(height: 14),
             GlassCard(
-              borderColor: NovaTheme.ok.withOpacity(0.55),
+              aurora: true,
+              borderColor: NovaTheme.ok.withOpacity(0.38),
               glowColor: NovaTheme.ok,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1226,9 +1265,11 @@ class _ReadyScreenState extends State<ReadyScreen> {
                 if (hasTsIp) {
                   buf.writeln('RDP: $tsIp:3389');
                 }
-                Clipboard.setData(ClipboardData(text: buf.toString()));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(t.t('info_copied'))),
+                _copyConnectionInfo(
+                  context,
+                  t,
+                  buf.toString(),
+                  containsPassword: hasInMemoryPass,
                 );
               },
             ),
@@ -1276,7 +1317,7 @@ class _ReadyScreenState extends State<ReadyScreen> {
         ],
       ),
     );
-    if (choice == null) return;
+    if (choice == null || !mounted || !context.mounted) return;
     setState(() => _stopping = true);
     try {
       await st.stopOrCancelCurrentRun(forceCancel: choice == 'force');
@@ -1296,6 +1337,42 @@ class _ReadyScreenState extends State<ReadyScreen> {
     } finally {
       if (mounted) setState(() => _stopping = false);
     }
+  }
+
+  Future<void> _copyConnectionInfo(
+    BuildContext context,
+    L10n t,
+    String value, {
+    required bool containsPassword,
+  }) async {
+    if (containsPassword) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.content_copy_rounded, color: NovaTheme.warn),
+          title: Text(t.t('copy_sensitive_confirm_title')),
+          content: Text(t.t('copy_sensitive_confirm_body')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(t.t('cancel')),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.copy_rounded),
+              label: Text(t.t('copy_sensitive_confirm_action')),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(t.t('info_copied'))),
+    );
   }
 
   String _remaining(AppState st) {

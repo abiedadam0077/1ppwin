@@ -206,37 +206,21 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
     );
   }
 
-  Widget _buildErrorState(L10n t, AppState st) => ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          GlassCard(
-            borderColor: NovaTheme.danger,
-            glowColor: NovaTheme.danger,
-            child: Column(
-              children: [
-                const Icon(Icons.cloud_off, color: NovaTheme.danger, size: 42),
-                const SizedBox(height: 10),
-                Text(
-                  t.t('repos_load_failed'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: NovaTheme.text, fontSize: 15, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  st.reposError ?? '',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
-                ),
-                const SizedBox(height: 14),
-                GradientButton(
-                  label: t.t('retry'),
-                  icon: Icons.refresh,
-                  onPressed: () => st.loadRepos(),
-                ),
-              ],
+  Widget _buildErrorState(L10n t, AppState st) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: NovaErrorState(
+            icon: Icons.cloud_off_rounded,
+            title: t.t('repos_load_failed'),
+            subtitle: st.reposError ?? '',
+            subtitleDirection: TextDirection.ltr,
+            action: SecondaryNeonButton(
+              label: t.t('retry'),
+              icon: Icons.refresh,
+              onPressed: () => st.loadRepos(),
             ),
           ),
-        ],
+        ),
       );
 
   Widget _buildEmptyState(L10n t, AppState st) {
@@ -385,6 +369,11 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                   ],
                 ),
               ),
+              IconButton(
+                tooltip: t.t('repo_details'),
+                icon: const Icon(Icons.info_outline_rounded, color: NovaTheme.textDim, size: 20),
+                onPressed: () => _showRepoDetails(context, st, t, r),
+              ),
             ],
           ),
           const SizedBox(height: 9),
@@ -422,26 +411,9 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                       icon: Icons.auto_fix_high,
                       color: NovaTheme.neonCyan,
                       busy: _installingRepo == r.fullName,
-                      onPressed: () async {
-                        setState(() => _installingRepo = r.fullName);
-                        try {
-                          await st.selectRepo(r, silentLog: true);
-                          await st.installOrRepairWorkflow(target: r);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(t.t('workflow_installed_ok'))),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('${t.t('error')}: $e')),
-                            );
-                          }
-                        } finally {
-                          if (mounted) setState(() => _installingRepo = null);
-                        }
-                      },
+                      onPressed: _installingRepo == r.fullName
+                          ? null
+                          : () => _confirmWorkflowSetup(context, st, t, r),
                     ),
                   )
                 else if (!hasSecrets)
@@ -494,6 +466,206 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
       ),
     );
   }
+
+  Future<void> _confirmWorkflowSetup(BuildContext context, AppState st, L10n t, Repo repo) async {
+    if (_installingRepo == repo.fullName) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.account_tree_outlined, color: NovaTheme.warn),
+        title: Text(t.t('workflow_confirm_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.t('workflow_confirm_body')),
+            const SizedBox(height: 10),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: SelectableText(
+                repo.fullName,
+                textAlign: TextAlign.left,
+                style: const TextStyle(color: NovaTheme.neonCyan, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.cloud_upload_outlined),
+            label: Text(t.t('workflow_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || !context.mounted) return;
+
+    setState(() => _installingRepo = repo.fullName);
+    try {
+      await st.selectRepo(repo, silentLog: true);
+      await st.installOrRepairWorkflow(target: repo);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t.t('workflow_installed_ok'))),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.t('error')}: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _installingRepo = null);
+    }
+  }
+
+  void _showRepoDetails(BuildContext context, AppState st, L10n t, Repo repo) {
+    final selected = st.selectedRepo?.fullName == repo.fullName;
+    final readiness = st.repoReadiness[repo.fullName];
+    final hasWorkflow = selected ? st.hasWorkflowFile : (readiness?.hasWorkflow ?? false);
+    final needsRepair = selected ? st.workflowNeedsRepair : (readiness?.workflowNeedsRepair ?? false);
+    final hasSecrets = selected ? st.secretsReady : (readiness?.hasRequiredSecrets ?? false);
+    final ready = hasWorkflow && !needsRepair && hasSecrets;
+    final checking = readiness?.checking == true;
+    final readinessLabel = checking
+        ? t.t('checking')
+        : ready
+            ? t.t('ready')
+            : needsRepair
+                ? t.t('needs_repair')
+                : !hasWorkflow
+                    ? t.t('not_ready')
+                    : t.t('needs_secrets');
+
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: NovaTheme.card,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(NovaTheme.radiusAurora)),
+            border: Border.all(color: NovaTheme.cardBorder),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 34,
+                    height: 4,
+                    decoration: BoxDecoration(color: NovaTheme.textMuted, borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.folder_copy_outlined, color: NovaTheme.neonCyan),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        t.t('repo_details'),
+                        style: const TextStyle(color: NovaTheme.text, fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    if (selected)
+                      StatusBadge(label: t.t('selected_badge'), color: NovaTheme.neonCyan, icon: Icons.check),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _repoDetailRow(t.t('repo'), repo.fullName, ltr: true),
+                _repoDetailRow(t.t('repo_visibility_label'), t.t(repo.isPrivate ? 'private' : 'public')),
+                _repoDetailRow(t.t('default_branch'), repo.defaultBranch, ltr: true),
+                if (repo.description?.trim().isNotEmpty == true)
+                  _repoDetailRow(t.t('repo_description'), repo.description!.trim()),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    StatusBadge(
+                      label: readinessLabel,
+                      color: checking ? NovaTheme.neonBlue : (ready ? NovaTheme.ok : NovaTheme.warn),
+                      icon: checking
+                          ? Icons.sync_rounded
+                          : ready
+                              ? Icons.check_circle_outline
+                              : Icons.pending_outlined,
+                      pulsing: checking,
+                    ),
+                    if (hasWorkflow) StatusBadge(label: t.t('workflow_installed'), color: NovaTheme.neonCyan),
+                    if (!hasSecrets && hasWorkflow)
+                      StatusBadge(label: t.t('needs_secrets'), color: NovaTheme.warn, icon: Icons.lock_outline),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (!selected)
+                  FilledButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(sheetContext);
+                      await st.selectRepo(repo);
+                      if (!context.mounted) return;
+                      if (Navigator.canPop(context)) Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Text(t.t('choose_repo')),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(sheetContext);
+                    if (!selected) await st.selectRepo(repo, silentLog: true);
+                    if (!context.mounted) return;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RepoSetupScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.tune_rounded),
+                  label: Text(t.t('setup_repo_title')),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: Text(t.t('cancel')),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _repoDetailRow(String label, String value, {bool ltr = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            Expanded(child: Text(label, style: const TextStyle(color: NovaTheme.textDim, fontSize: 13))),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Directionality(
+                textDirection: ltr ? TextDirection.ltr : Directionality.of(context),
+                child: SelectableText(
+                  value,
+                  textAlign: ltr ? TextAlign.left : TextAlign.end,
+                  maxLines: 2,
+                  style: const TextStyle(color: NovaTheme.text, fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 /// Dedicated, compact form for creating and optionally configuring a repository.
@@ -541,6 +713,69 @@ class _CreateRepoScreenState extends State<CreateRepoScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _confirmCreateRepository() async {
+    final t = L10n.of(context);
+    final name = _name.text.trim();
+    if (name.isEmpty || _busy) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.create_new_folder_outlined, color: NovaTheme.neonCyan),
+        title: Text(t.t('create_repo_confirm_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.t('create_repo_confirm_body')),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: NovaTheme.bg2,
+                borderRadius: BorderRadius.circular(NovaTheme.radiusMedium),
+                border: Border.all(color: NovaTheme.cardBorder),
+              ),
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: SelectableText(
+                  name,
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(color: NovaTheme.text, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                StatusBadge(
+                  label: t.t(_isPrivate ? 'private' : 'public'),
+                  color: _isPrivate ? NovaTheme.neonPurpleSoft : NovaTheme.neonCyan,
+                ),
+                if (_autoWorkflow)
+                  StatusBadge(label: t.t('workflow_will_install'), color: NovaTheme.ok),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.check_rounded),
+            label: Text(t.t('create_repo_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) await _createRepository();
   }
 
   @override
@@ -613,7 +848,7 @@ class _CreateRepoScreenState extends State<CreateRepoScreen> {
               label: t.t('create'),
               icon: Icons.check_rounded,
               busy: _busy,
-              onPressed: _name.text.trim().isNotEmpty && !_busy ? _createRepository : null,
+              onPressed: _name.text.trim().isNotEmpty && !_busy ? _confirmCreateRepository : null,
             ),
             const SizedBox(height: 6),
             TextButton(
@@ -649,7 +884,25 @@ class _RepoSetupScreenState extends State<RepoSetupScreen> {
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: Text(t.t('setup_repo_title'))),
         body: repo == null
-            ? Center(child: Text(t.t('no_repo_selected'), style: const TextStyle(color: NovaTheme.textDim)))
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: NovaEmptyState(
+                    icon: Icons.folder_off_outlined,
+                    title: t.t('no_repo_selected'),
+                    subtitle: t.t('no_repo_selected_sub'),
+                    color: NovaTheme.warn,
+                    action: GradientButton(
+                      label: t.t('choose_repo'),
+                      icon: Icons.folder_open_rounded,
+                      onPressed: () {
+                        st.setTab(1);
+                        Navigator.of(context).maybePop();
+                      },
+                    ),
+                  ),
+                ),
+              )
             : ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
@@ -726,25 +979,7 @@ class _RepoSetupScreenState extends State<RepoSetupScreen> {
                           icon: Icons.cloud_upload_outlined,
                           color: st.repoReady ? NovaTheme.neonCyan : NovaTheme.warn,
                           busy: _wfBusy,
-                          onPressed: () async {
-                            setState(() => _wfBusy = true);
-                            try {
-                              await st.installOrRepairWorkflow();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(t.t('workflow_installed_ok'))),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('${t.t('error')}: $e')),
-                                );
-                              }
-                            } finally {
-                              if (mounted) setState(() => _wfBusy = false);
-                            }
-                          },
+                          onPressed: _wfBusy ? null : () => _confirmAndInstallWorkflow(context, st, t),
                         ),
                       ],
                     ),
@@ -807,4 +1042,61 @@ class _RepoSetupScreenState extends State<RepoSetupScreen> {
       ),
     );
   }
+
+  Future<void> _confirmAndInstallWorkflow(BuildContext context, AppState st, L10n t) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.account_tree_outlined, color: NovaTheme.warn),
+        title: Text(t.t('workflow_confirm_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.t('workflow_confirm_body')),
+            const SizedBox(height: 10),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: SelectableText(
+                st.selectedRepo?.fullName ?? '',
+                textAlign: TextAlign.left,
+                style: const TextStyle(color: NovaTheme.neonCyan, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.cloud_upload_outlined),
+            label: Text(t.t('workflow_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || !context.mounted) return;
+
+    setState(() => _wfBusy = true);
+    try {
+      await st.installOrRepairWorkflow();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t.t('workflow_installed_ok'))),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.t('error')}: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _wfBusy = false);
+    }
+  }
+
 }

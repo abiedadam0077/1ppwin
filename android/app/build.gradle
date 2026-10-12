@@ -43,7 +43,7 @@ if (releaseTaskRequested) {
 android {
     namespace = "app.nova.windowscloud"
     compileSdk = 35
-    ndkVersion = "26.1.10909125"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

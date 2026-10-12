@@ -202,11 +202,21 @@ jobs:
       - name: Cleanup signing material
         if: ${{ always() }}
         run: |
-          rm -f \
-            "$RUNNER_TEMP/nova-release.jks" \
-            "$RUNNER_TEMP/nova-release-certificate.txt" \
-            "$RUNNER_TEMP/nova-keytool-error.txt" \
+          set -euo pipefail
+          signing_material=(
+            "$RUNNER_TEMP/nova-release.jks"
+            "$RUNNER_TEMP/nova-release-certificate.txt"
+            "$RUNNER_TEMP/nova-keytool-error.txt"
             "$RUNNER_TEMP/nova-apksigner.txt"
+          )
+          rm -f -- "${signing_material[@]}"
+          for path in "${signing_material[@]}"; do
+            if [[ -e "$path" ]]; then
+              echo "::error::Failed to remove temporary signing material."
+              exit 1
+            fi
+          done
+          echo "Verified temporary signing material has been removed."
 
       - name: Report build diagnostics
         if: ${{ always() }}

@@ -188,7 +188,7 @@ jobs:
           SIGNATURE_INFO="$RUNNER_TEMP/nova-apksigner.txt"
           "$APKSIGNER" verify --verbose --print-certs "$APK" > "$SIGNATURE_INFO"
           EXPECTED="$(printf '%s' "$NOVA_RELEASE_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
-          ACTUAL="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$SIGNATURE_INFO" | head -n 1 | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          ACTUAL="$(grep -iF 'certificate SHA-256 digest:' "$SIGNATURE_INFO" | head -n 1 | sed -E 's/^.*certificate SHA-256 digest:[[:space:]]*//' | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]' || true)"
           if [[ -z "$ACTUAL" || "$ACTUAL" != "$EXPECTED" ]]; then
             echo "::error::APK signer SHA-256 does not match the persistent nova_release keystore certificate."
             echo "::error::Expected keystore certificate SHA-256: ${EXPECTED:-not found}"

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../core/l10n.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
-import '../services/admob_service.dart';
 import '../state/app_state.dart';
 import 'onboarding.dart';
 import 'repos.dart';
@@ -382,19 +381,6 @@ class SettingsScreen extends StatelessWidget {
                     color: NovaTheme.warn,
                     label: t.t('use_pat_instead'),
                     onTap: () => showPatSignInDialog(context),
-                  ),
-                  const Divider(color: NovaTheme.cardBorder, height: 1),
-                  _settingsItem(
-                    icon: Icons.privacy_tip_outlined,
-                    color: NovaTheme.neonCyan,
-                    label: t.t('privacy_options'),
-                    onTap: () async {
-                      final opened = await NovaAdMob.showPrivacyOptions();
-                      if (!context.mounted || opened) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(t.t('privacy_options_unavailable'))),
-                      );
-                    },
                   ),
                 ],
               ),

@@ -73,11 +73,7 @@ android {
     }
 
     buildTypes {
-        debug {
-            manifestPlaceholders.put("admobAppId", "ca-app-pub-3940256099942544~3347511713")
-        }
         release {
-            manifestPlaceholders.put("admobAppId", "ca-app-pub-8333402469736519~5380632760")
             signingConfig = signingConfigs.release
         }
     }

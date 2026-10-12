@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../core/l10n.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
-import '../services/admob_service.dart';
 import '../state/app_state.dart';
 import 'backups.dart';
 import 'more.dart';
@@ -235,7 +234,6 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
             ],
           ),
         ),
-        bottomNavigationBar: st.currentTab == 0 ? const NovaBannerAdSlot() : null,
       ),
     );
   }

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../core/l10n.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
-import '../services/admob_service.dart';
 import '../services/github_service.dart';
 import '../state/app_state.dart';
 import 'session.dart';
@@ -37,12 +36,6 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _manualRefreshRepos(AppState st) async {
-    await st.loadRepos();
-    if (!mounted || st.reposError != null) return;
-    await NovaAdMob.showInterstitialIfEligible();
   }
 
   bool _matchesFilter(Repo r, RepoReadiness? rd) {
@@ -84,7 +77,7 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
             IconButton(
               tooltip: t.t('refresh'),
               icon: const Icon(Icons.refresh, color: NovaTheme.neonCyan),
-              onPressed: st.busy ? null : () => _manualRefreshRepos(st),
+              onPressed: st.busy ? null : () => st.loadRepos(),
             ),
             IconButton(
               tooltip: t.t('new_repo'),
@@ -197,7 +190,7 @@ class _RepoSelectorScreenState extends State<RepoSelectorScreen> {
                       : list.isEmpty
                           ? _buildEmptyState(t, st)
                           : RefreshIndicator(
-                              onRefresh: () => _manualRefreshRepos(st),
+                              onRefresh: () => st.loadRepos(),
                               color: NovaTheme.neonBlue,
                               child: ListView.separated(
                                 padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),

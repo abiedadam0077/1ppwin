@@ -15,21 +15,16 @@ are intentionally excluded from Git.
 
 `.github/workflows/build-apk.yml` validates PRs and builds on main/session branches:
 
-- Flutter 3.24.5, Java 17, Android compile SDK 35, AGP 8.6.1, Kotlin 2.1.10.
-- Google Mobile Ads 5.3.1 uses Google's test IDs in Debug/Profile and the
-  owner-supplied IDs in Release; UMP consent and a privacy-options entry point
-  are included. Banner inventory is reserved below Home content; an
-  interstitial is considered only after a successful, user-requested repository
-  refresh, with a 20-minute persistent cooldown. No rewarded ads are used.
+- Flutter 3.24.5, Java 17, Android compile SDK 35, NDK 26.1.10909125, AGP 8.6.1,
+  and Kotlin 2.1.10.
 - CI runs `flutter pub get`, analyzer, tests, and a non-published Debug APK
   validation build. Pub's resolved lockfile is included in build diagnostics.
 - A Release APK requires the same persistent `nova-release.jks`, alias
   `nova_release`, and four `NOVA_RELEASE_*` Actions secrets for every build.
   Missing secrets fail Release packaging; there is no Debug/unsigned fallback.
-  CI checks `applicationId`, production AdMob App ID, APK signature and
-  certificate SHA-256, then calculates the APK SHA-256 before publishing an
-  artifact. The JKS exists only in the runner's temporary directory and is
-  removed after the job.
+  CI checks `applicationId`, APK signature and certificate SHA-256, then
+  calculates the APK SHA-256 before publishing. The JKS exists only in the
+  runner's temporary directory and is removed after the job.
 - Analyzer/test/build diagnostics are retained for seven days; only a
   signature-verified Release APK artifact is retained for 30 days. Successful
   main builds publish the APK and checksum to the `apk-latest` prerelease.
@@ -37,17 +32,11 @@ are intentionally excluded from Git.
 Direct APK URL from the **previous** main release:
 https://github.com/abiedadam0077/1ppwin/releases/download/apk-latest/NOVA-Windows-Cloud.apk
 
-That URL is not the new signed release. The older Gradle configuration used
-Debug signing, and its certificate could not be downloaded from this sandbox for
+That is not the new signed release. The older Gradle configuration used Debug
+signing, and its certificate could not be downloaded from this sandbox for
 comparison; do not assume it can be upgraded in place. A new public link should
 be shared only after a successful signature-verified build. PR runs deliberately
 do not publish APKs.
-
-Privacy and rollout notes: `docs/privacy-policy-draft.md` is not published and
-still needs a real developer contact, audience decision and HTTPS URL.
-`docs/admob-setup-notes.md` records the direct-APK/app-store verification caveat;
-`docs/app-ads.txt.template` is not live or verified. Signing setup and safe
-secret names are documented in `docs/release-signing-setup.md`.
 
 ## Sign-in
 

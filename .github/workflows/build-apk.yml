@@ -62,8 +62,7 @@ jobs:
       - name: Resolve dependencies
         run: |
           mkdir -p .ci
-          # Adding an SDK dependency changes pubspec.lock. Pub preserves already
-          # locked compatible versions and resolves only what is newly required.
+          # Resolve the Flutter app's dependencies using the checked-in lockfile.
           flutter pub get 2>&1 | tee .ci/pub-get.log
 
       - name: Analyze & test
@@ -158,7 +157,7 @@ jobs:
         run: |
           flutter build apk --release 2>&1 | tee .ci/build.log
 
-      - name: Verify package ID, AdMob app ID, and release signature
+      - name: Verify package ID and release signature
         if: ${{ github.event_name != 'pull_request' }}
         run: |
           set -euo pipefail
@@ -187,14 +186,6 @@ jobs:
           fi
           echo "Verified applicationId: $PACKAGE"
 
-          MANIFEST_DUMP="$RUNNER_TEMP/nova-release-manifest.txt"
-          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > "$MANIFEST_DUMP"
-          if ! grep -Fq 'ca-app-pub-8333402469736519~5380632760' "$MANIFEST_DUMP"; then
-            echo "::error::Release APK does not contain the configured production AdMob App ID."
-            exit 1
-          fi
-          echo "Verified production AdMob App ID is present in the release manifest."
-
           SIGNATURE_INFO="$RUNNER_TEMP/nova-apksigner.txt"
           "$APKSIGNER" verify --verbose --print-certs "$APK" > "$SIGNATURE_INFO"
           EXPECTED="$(printf '%s' "$NOVA_RELEASE_CERT_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
@@ -216,7 +207,6 @@ jobs:
             "$RUNNER_TEMP/nova-release.jks" \
             "$RUNNER_TEMP/nova-release-certificate.txt" \
             "$RUNNER_TEMP/nova-keytool-error.txt" \
-            "$RUNNER_TEMP/nova-release-manifest.txt" \
             "$RUNNER_TEMP/nova-apksigner.txt"
 
       - name: Report build diagnostics

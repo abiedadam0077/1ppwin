@@ -191,6 +191,8 @@ jobs:
           ACTUAL="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$SIGNATURE_INFO" | head -n 1 | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
           if [[ -z "$ACTUAL" || "$ACTUAL" != "$EXPECTED" ]]; then
             echo "::error::APK signer SHA-256 does not match the persistent nova_release keystore certificate."
+            echo "::error::Expected keystore certificate SHA-256: ${EXPECTED:-not found}"
+            echo "::error::Actual APK signer SHA-256: ${ACTUAL:-not found}"
             exit 1
           fi
           echo "Verified release signer SHA-256: $ACTUAL"

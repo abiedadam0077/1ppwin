@@ -309,6 +309,7 @@ class SettingsScreen extends StatelessWidget {
               GlassCard(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 borderColor: NovaTheme.neonBlue.withOpacity(0.48),
+                onTap: () => Navigator.of(context).pushNamed('/profile'),
                 child: Row(
                   children: [
                     CircleAvatar(
@@ -456,6 +457,20 @@ class SettingsScreen extends StatelessWidget {
                     color: NovaTheme.warn,
                     label: t.t('use_pat_instead'),
                     onTap: () => showPatSignInDialog(context),
+                  ),
+                  const Divider(color: NovaTheme.cardBorder, height: 1),
+                  _settingsItem(
+                    icon: Icons.health_and_safety_outlined,
+                    color: NovaTheme.neonCyan,
+                    label: t.t('diagnostics'),
+                    onTap: () => Navigator.of(context).pushNamed('/diagnostics'),
+                  ),
+                  const Divider(color: NovaTheme.cardBorder, height: 1),
+                  _settingsItem(
+                    icon: Icons.notifications_none_rounded,
+                    color: NovaTheme.neonPurpleSoft,
+                    label: t.t('notifications'),
+                    onTap: () => Navigator.of(context).pushNamed('/notifications'),
                   ),
                 ],
               ),

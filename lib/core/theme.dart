@@ -4,23 +4,23 @@ import 'package:flutter/services.dart';
 /// Shared NOVA design tokens. Keep product state/colors semantic; screen code
 /// should use these tokens rather than adding one-off neon values.
 class NovaTheme {
-  static const Color bg = Color(0xFF060B18);
-  static const Color bg2 = Color(0xFF0B1425);
-  static const Color bg3 = Color(0xFF12203A);
-  static const Color card = Color(0xFF0F1A2D);
-  static const Color cardElevated = Color(0xFF15233B);
-  static const Color cardBorder = Color(0xFF26364E);
-  static const Color cardBorderBright = Color(0xFF3B6689);
-  static const Color neonBlue = Color(0xFF3988F5);
-  static const Color neonPurple = Color(0xFF7868D9);
-  static const Color neonPurpleSoft = Color(0xFFB2A7F2);
-  static const Color neonCyan = Color(0xFF54D1E8);
-  static const Color ok = Color(0xFF4DCD98);
-  static const Color warn = Color(0xFFE9B957);
-  static const Color danger = Color(0xFFE96F7D);
-  static const Color text = Color(0xFFF0F4FC);
-  static const Color textDim = Color(0xFFB0BDD1);
-  static const Color textMuted = Color(0xFF8492A8);
+  static const Color bg = Color(0xFF040817);
+  static const Color bg2 = Color(0xFF081128);
+  static const Color bg3 = Color(0xFF101D3B);
+  static const Color card = Color(0xFF0A1530);
+  static const Color cardElevated = Color(0xFF122143);
+  static const Color cardBorder = Color(0xFF27365F);
+  static const Color cardBorderBright = Color(0xFF4655A0);
+  static const Color neonBlue = Color(0xFF2478FF);
+  static const Color neonPurple = Color(0xFF8044F5);
+  static const Color neonPurpleSoft = Color(0xFFAA8CFF);
+  static const Color neonCyan = Color(0xFF20D7FF);
+  static const Color ok = Color(0xFF26D889);
+  static const Color warn = Color(0xFFFFBD3F);
+  static const Color danger = Color(0xFFFF5574);
+  static const Color text = Color(0xFFF3F6FF);
+  static const Color textDim = Color(0xFFBAC6E0);
+  static const Color textMuted = Color(0xFF8390AD);
 
   static const String fontFamilyName = 'Cairo';
 
@@ -38,20 +38,21 @@ class NovaTheme {
   static const double radiusAurora = 22;
 
   static const LinearGradient btnGradient = LinearGradient(
-    colors: [Color(0xFF388CF3), Color(0xFF4776D6)],
+    colors: [Color(0xFF09AFFF), Color(0xFF326BFF), Color(0xFF713EFF)],
+    stops: [0, 0.58, 1],
     begin: AlignmentDirectional.centerStart,
     end: AlignmentDirectional.centerEnd,
   );
 
   static const LinearGradient purpleGradient = LinearGradient(
-    colors: [Color(0xFF7868D9), Color(0xFF4778CB)],
+    colors: [Color(0xFF8144F5), Color(0xFF385FFF)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   /// Reserved for the few Aurora hero surfaces; standard cards stay solid.
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xF2142542), Color(0xEB0D192D)],
+    colors: [Color(0xF2162854), Color(0xEF0A1530)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

@@ -12,6 +12,9 @@ import 'screens/home_shell.dart';
 import 'screens/onboarding.dart';
 import 'screens/repos.dart';
 import 'screens/security.dart';
+import 'screens/diagnostics.dart';
+import 'screens/notifications.dart';
+import 'screens/profile.dart';
 import 'state/app_state.dart';
 
 Future<void> main() async {
@@ -83,6 +86,9 @@ class _NovaAppState extends State<NovaApp> {
       routes: {
         '/security': (_) => const SecurityScreen(),
         '/repos': (_) => const RepoSelectorScreen(),
+        '/notifications': (_) => const NotificationsScreen(),
+        '/diagnostics': (_) => const DiagnosticsScreen(),
+        '/profile': (_) => const ProfileScreen(),
       },
       home: AnimatedSwitcher(
         duration: const Duration(milliseconds: 320),

@@ -230,6 +230,11 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
           ),
           actions: [
             IconButton(
+              tooltip: t.t('notifications'),
+              icon: const Icon(Icons.notifications_none_rounded, color: NovaTheme.neonCyan),
+              onPressed: () => Navigator.of(context).pushNamed('/notifications'),
+            ),
+            IconButton(
               tooltip: t.t('refresh'),
               icon: const Icon(Icons.refresh, color: NovaTheme.neonCyan),
               onPressed: st.statusBusy
@@ -256,7 +261,7 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
                   name: displayName,
                   login: login,
                   avatar: avatar,
-                  onTap: () => st.setTab(4),
+                  onTap: () => Navigator.of(context).pushNamed('/profile'),
                 ),
                 const SizedBox(height: 14),
               ],
@@ -267,6 +272,8 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
               ],
               const SizedBox(height: 12),
               _buildLatestBackupCard(context, st, t),
+              const SizedBox(height: 12),
+              _buildRecentActivityCard(context, st, t),
             ],
           ),
         ),
@@ -786,6 +793,132 @@ class _HomeFlowScreenState extends State<HomeFlowScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  IconData _activityIcon(String type) {
+    switch (type) {
+      case 'act_login':
+        return Icons.login_rounded;
+      case 'act_select_repo':
+      case 'act_create_repo':
+        return Icons.folder_special_outlined;
+      case 'act_install_workflow':
+        return Icons.account_tree_outlined;
+      case 'act_save_secrets':
+        return Icons.enhanced_encryption_outlined;
+      case 'act_start_run':
+        return Icons.rocket_launch_outlined;
+      case 'act_restore_backup':
+        return Icons.settings_backup_restore_rounded;
+      case 'act_stop_run':
+        return Icons.stop_circle_outlined;
+      default:
+        return Icons.history_rounded;
+    }
+  }
+
+  String _activityTime(DateTime value) {
+    final local = value.toLocal();
+    return '${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} '
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildRecentActivityCard(BuildContext context, AppState st, L10n t) {
+    final ordered = List<ActivityEntry>.of(st.activity)
+      ..sort((a, b) => b.time.compareTo(a.time));
+    final recent = ordered.take(2).toList();
+    return GlassCard(
+      padding: const EdgeInsets.all(13),
+      onTap: () => st.setTab(3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.history_rounded, color: NovaTheme.neonCyan, size: 19),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  t.t('activity'),
+                  style: const TextStyle(color: NovaTheme.text, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => st.setTab(3),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 15),
+                label: Text(t.t('open_activity'), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          if (recent.isEmpty)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 27, top: 2, bottom: 2),
+              child: Text(
+                t.t('activity_empty'),
+                style: const TextStyle(color: NovaTheme.textDim, fontSize: 12),
+              ),
+            )
+          else
+            for (final entry in recent)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: (entry.ok ? NovaTheme.ok : NovaTheme.danger).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: (entry.ok ? NovaTheme.ok : NovaTheme.danger).withOpacity(0.28),
+                        ),
+                      ),
+                      child: Icon(
+                        _activityIcon(entry.type),
+                        size: 17,
+                        color: entry.ok ? NovaTheme.ok : NovaTheme.danger,
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.t(entry.type),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: NovaTheme.text, fontSize: 11.5, fontWeight: FontWeight.w700),
+                          ),
+                          if (entry.detail.isNotEmpty)
+                            Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Text(
+                                entry.detail,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.left,
+                                style: const TextStyle(color: NovaTheme.textDim, fontSize: 10.5),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        _activityTime(entry.time),
+                        style: const TextStyle(color: NovaTheme.textMuted, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
         ],
       ),
     );

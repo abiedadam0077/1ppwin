@@ -180,14 +180,14 @@ class GradientButton extends StatelessWidget {
         color: enabled ? null : NovaTheme.cardElevated.withOpacity(0.65),
         border: enabled ? null : Border.all(color: NovaTheme.cardBorder.withOpacity(0.4)),
         boxShadow: enabled
-          ? [
-              BoxShadow(
-                color: NovaTheme.neonBlue.withOpacity(0.16),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ]
-          : null,
+            ? [
+                BoxShadow(
+                  color: NovaTheme.neonBlue.withOpacity(0.22),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(

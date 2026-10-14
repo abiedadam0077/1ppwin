@@ -108,7 +108,7 @@ class MinecraftWorkflowInspection {
   static bool needsUpdate(String? yaml) {
     if (yaml == null || !yaml.contains(schemaMarker)) return true;
     return requiredDispatchInputs.any(
-      (name) => !RegExp('^ {6}${RegExp.escape(name)}:\\s*$', multiLine: true).hasMatch(yaml),
+      (name) => !RegExp(r'^ {6}' + RegExp.escape(name) + r':\s*$', multiLine: true).hasMatch(yaml),
     );
   }
 }

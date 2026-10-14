@@ -7,6 +7,8 @@ import 'package:nova_windows_cloud/services/github_service.dart';
 import 'package:nova_windows_cloud/services/minecraft_versions.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('Minecraft feature labels are localized in all supported languages', () {
     expect(L10n('ar').t('minecraft_home_title'), 'Minecraft Java Cloud');
     expect(L10n('ar').t('minecraft_start'), 'بدء Minecraft Java Cloud');

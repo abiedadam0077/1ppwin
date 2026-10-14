@@ -1622,7 +1622,7 @@ class _MinecraftPlayScreenState extends State<MinecraftPlayScreen> {
     final t = L10n.of(context);
     final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
     return PopScope<void>(
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) _releaseHeldKeys();
       },
       child: Scaffold(

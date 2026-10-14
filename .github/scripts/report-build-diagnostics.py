@@ -38,7 +38,7 @@ if status == "failure":
         for index, part in enumerate(parts, 1):
             annotate("error", f"{log.name} [{index}/{len(parts)}]", part)
 elif status == "success":
-    for name in ("analyze", "test", "build"):
+    for name in ("pub-get", "analyze", "test", "debug-build", "build"):
         log = Path(f".ci/{name}.log")
         if log.exists():
             text = "\n".join(log.read_text(errors="replace").splitlines()[-8:])
@@ -56,7 +56,13 @@ if lockfile.exists():
         stderr=subprocess.DEVNULL,
         check=False,
     ).returncode == 0
-    if not tracked:
+    lockfile_changed = subprocess.run(
+        ["git", "diff", "--quiet", "--", "pubspec.lock"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    ).returncode != 0
+    if not tracked or lockfile_changed:
         encoded = base64.b64encode(gzip.compress(lockfile.read_bytes(), mtime=0)).decode("ascii")
         for index, part in enumerate(chunks(encoded), 1):
             annotate("notice", f"pubspec-lock-gzip-{index:03d}", part)

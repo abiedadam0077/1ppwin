@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="navy">#050A1E</color>
-    <color name="neon_blue">#2979FF</color>
-    <color name="neon_purple">#7C4DFF</color>
+    <color name="navy">#05091B</color>
+    <color name="neon_blue">#3478FF</color>
+    <color name="neon_purple">#8057FF</color>
 </resources>

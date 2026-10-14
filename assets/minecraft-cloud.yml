@@ -1,0 +1,843 @@
+name: Minecraft Java Cloud
+
+# Independent Linux desktop session for the Java Edition. The runner and its
+# disk are temporary; only a verified, encrypted world snapshot is persistent.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Official Minecraft Java version ID from the in-app list
+        type: string
+        required: true
+      hours:
+        description: Session duration (1-4 hours; reserve time is kept for saving)
+        type: choice
+        options: ['1', '2', '3', '4']
+        default: '2'
+        required: true
+      memory_gb:
+        description: Maximum Java heap; checked against live runner memory
+        type: choice
+        options: ['2', '4', '6', '8']
+        default: '4'
+        required: true
+      resolution:
+        description: Xvfb desktop resolution
+        type: choice
+        options: ['1280x720', '1600x900']
+        default: '1280x720'
+        required: true
+      render_distance:
+        description: Minecraft render distance in chunks
+        type: choice
+        options: ['4', '6', '8', '10', '12']
+        default: '6'
+        required: true
+      fps_limit:
+        description: Requested client frame-rate limit (software rendering may be slower)
+        type: choice
+        options: ['20', '30', '45', '60']
+        default: '30'
+        required: true
+      restore_tag:
+        description: Exact complete Minecraft world backup tag, or 'none' for a fresh worlds folder
+        type: string
+        required: true
+        default: none
+
+permissions:
+  contents: write # Required only for the one-shot stop signal and encrypted backup Releases.
+
+concurrency:
+  group: nova-minecraft-java-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  minecraft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 358
+
+    steps:
+      - name: Record job start time
+        run: echo "NOVA_MC_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Validate private repository, secrets, inputs, and runner capacity
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MC_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MC_VIEWER_PASSWORD: ${{ secrets.MINECRAFT_ACCESS_PASSWORD }}
+          MC_BACKUP_PASSWORD: ${{ secrets.MINECRAFT_BACKUP_PASSWORD }}
+          MC_VERSION_INPUT: ${{ inputs.version }}
+          MC_HOURS_INPUT: ${{ inputs.hours }}
+          MC_MEMORY_INPUT: ${{ inputs.memory_gb }}
+          MC_RESOLUTION_INPUT: ${{ inputs.resolution }}
+          MC_RENDER_DISTANCE_INPUT: ${{ inputs.render_distance }}
+          MC_FPS_INPUT: ${{ inputs.fps_limit }}
+          MC_RESTORE_TAG_INPUT: ${{ inputs.restore_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRIVATE=$(gh api "/repos/$GITHUB_REPOSITORY" --jq '.private')
+          if [ "$PRIVATE" != "true" ]; then
+            echo "::error::Minecraft world backups require a private GitHub repository."
+            exit 1
+          fi
+          for name in MC_CLIENT_ID MC_VIEWER_PASSWORD MC_BACKUP_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              case "$name" in
+                MC_CLIENT_ID) secret_name=MICROSOFT_CLIENT_ID ;;
+                MC_VIEWER_PASSWORD) secret_name=MINECRAFT_ACCESS_PASSWORD ;;
+                MC_BACKUP_PASSWORD) secret_name=MINECRAFT_BACKUP_PASSWORD ;;
+              esac
+              echo "::error::Required Actions secret $secret_name is missing. Configure it in NOVA Minecraft Cloud settings."
+              exit 1
+            fi
+          done
+          [[ "$MC_VERSION_INPUT" =~ ^[A-Za-z0-9._+-]{1,40}$ ]] || { echo "::error::Invalid Minecraft version ID."; exit 1; }
+          [[ "$MC_HOURS_INPUT" =~ ^[1-4]$ ]] || { echo "::error::Session duration must be between 1 and 4 hours."; exit 1; }
+          [[ "$MC_MEMORY_INPUT" =~ ^(2|4|6|8)$ ]] || { echo "::error::Unsupported Java heap selection."; exit 1; }
+          [[ "$MC_RESOLUTION_INPUT" =~ ^(1280x720|1600x900)$ ]] || { echo "::error::Unsupported display resolution."; exit 1; }
+          [[ "$MC_RENDER_DISTANCE_INPUT" =~ ^(4|6|8|10|12)$ ]] || { echo "::error::Unsupported render-distance selection."; exit 1; }
+          [[ "$MC_FPS_INPUT" =~ ^(20|30|45|60)$ ]] || { echo "::error::Unsupported frame-rate selection."; exit 1; }
+          if [ "$MC_RESTORE_TAG_INPUT" != "none" ] &&
+             ! [[ "$MC_RESTORE_TAG_INPUT" =~ ^minecraft-world-[0-9]{8}-[0-9]{6}-[0-9]+$ ]]; then
+            echo "::error::The selected world backup tag is not valid."; exit 1
+          fi
+          AVAILABLE_KB=$(awk '/MemAvailable:/ {print $2; exit}' /proc/meminfo)
+          AVAILABLE_GB=$(( AVAILABLE_KB / 1024 / 1024 ))
+          if [ "$((MC_MEMORY_INPUT + 3))" -gt "$AVAILABLE_GB" ]; then
+            echo "::error::The selected Java heap exceeds the runner's currently available memory after reserving 3 GiB for Linux, Xvfb, and native game libraries."
+            exit 1
+          fi
+          FREE_KB=$(df --output=avail -k "$RUNNER_TEMP" | tail -1 | tr -d ' ')
+          if [ "${FREE_KB:-0}" -lt 8388608 ]; then
+            echo "::error::Less than 8 GiB of temporary runner storage is available; refusing to start a session that cannot safely install and snapshot worlds."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          version = os.environ['MC_VERSION_INPUT']
+          url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
+          with urllib.request.urlopen(url, timeout=30) as response:
+              manifest = json.load(response)
+          matches = [item for item in manifest.get('versions', [])
+                     if item.get('id') == version and item.get('type') in ('release', 'snapshot')]
+          if not matches:
+              raise SystemExit('::error::The requested version is not present in Mojang’s current official Java version manifest.')
+          print('Confirmed requested Java version in Mojang official metadata.')
+          PY
+          echo "MC_VERSION=$MC_VERSION_INPUT" >> "$GITHUB_ENV"
+          echo "MC_HOURS=$MC_HOURS_INPUT" >> "$GITHUB_ENV"
+          echo "MC_MEMORY_GB=$MC_MEMORY_INPUT" >> "$GITHUB_ENV"
+          echo "MC_RESOLUTION=$MC_RESOLUTION_INPUT" >> "$GITHUB_ENV"
+          echo "MC_RENDER_DISTANCE=$MC_RENDER_DISTANCE_INPUT" >> "$GITHUB_ENV"
+          echo "MC_FPS_LIMIT=$MC_FPS_INPUT" >> "$GITHUB_ENV"
+          echo "MC_RESTORE_TAG=$MC_RESTORE_TAG_INPUT" >> "$GITHUB_ENV"
+
+      - name: Set up supported Java runtimes
+        if: ${{ steps.preflight.outcome == 'success' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '8, 11, 17, 21, 25'
+
+      - name: Install Linux graphics, noVNC, and pinned launcher dependency
+        if: ${{ steps.preflight.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            xvfb x11vnc xauth x11-utils openbox novnc websockify \
+            libgl1-mesa-dri libglx-mesa0 libx11-6 libxext6 libxi6 \
+            libxrandr2 libxrender1 libxtst6 libxss1 libnss3 libgbm1 \
+            libasound2t64 fonts-dejavu-core zstd gnupg curl
+          python3 -m venv "$RUNNER_TEMP/nova-minecraft-venv"
+          "$RUNNER_TEMP/nova-minecraft-venv/bin/python" -m pip install \
+            --disable-pip-version-check --no-cache-dir 'minecraft-launcher-lib==8.0'
+          test -f /usr/share/novnc/core/rfb.js
+          echo "MC_VENV=$RUNNER_TEMP/nova-minecraft-venv" >> "$GITHUB_ENV"
+          echo "MC_HOME=$RUNNER_TEMP/nova-minecraft-home/.minecraft" >> "$GITHUB_ENV"
+
+      - name: Restore the explicitly selected encrypted world backup
+        if: ${{ steps.preflight.outcome == 'success' && inputs.restore_tag != 'none' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MC_BACKUP_PASSWORD: ${{ secrets.MINECRAFT_BACKUP_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_TOKEN="$GH_TOKEN"
+          BACKUP_PASSWORD="$MC_BACKUP_PASSWORD"
+          unset GH_TOKEN GITHUB_TOKEN MC_BACKUP_PASSWORD
+          TAG="$MC_RESTORE_TAG"
+          if ! GH_TOKEN="$RELEASE_TOKEN" gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[].name' | grep -qx 'COMPLETE'; then
+            echo "::error::The selected backup is missing its COMPLETE marker; it will not be restored."
+            exit 1
+          fi
+          ASSETS=$(GH_TOKEN="$RELEASE_TOKEN" gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          printf '%s\n' "$ASSETS" | grep -qx 'worlds.json' || { echo "::error::Backup metadata is missing."; exit 1; }
+          printf '%s\n' "$ASSETS" | grep -qx 'worlds.enc.sha256' || { echo "::error::Backup integrity checksum is missing."; exit 1; }
+          PARTS=$(printf '%s\n' "$ASSETS" | grep -E '^worlds\.enc\.part[0-9]{3,}$' | sort || true)
+          [ -n "$PARTS" ] || { echo "::error::Encrypted world backup parts are missing."; exit 1; }
+          DL="$RUNNER_TEMP/nova-minecraft-restore"
+          mkdir -p "$DL" "$RUNNER_TEMP/nova-minecraft-gpg"
+          chmod 700 "$RUNNER_TEMP/nova-minecraft-gpg"
+          PASSFILE="$RUNNER_TEMP/nova-minecraft-gpg/passphrase"
+          printf '%s' "$BACKUP_PASSWORD" > "$PASSFILE"
+          chmod 600 "$PASSFILE"
+          unset BACKUP_PASSWORD
+          GH_TOKEN="$RELEASE_TOKEN" gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'worlds.enc.sha256' --pattern 'worlds.json' --dir "$DL" --clobber
+          : > "$DL/worlds.enc"
+          while IFS= read -r part; do
+            [ -n "$part" ] || continue
+            GH_TOKEN="$RELEASE_TOKEN" gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$part" --dir "$DL" --clobber
+            cat "$DL/$part" >> "$DL/worlds.enc"
+            rm -f "$DL/$part"
+          done <<< "$PARTS"
+          unset RELEASE_TOKEN
+          (cd "$DL" && sha256sum --check worlds.enc.sha256)
+          if ! gpg --batch --yes --pinentry-mode loopback --passphrase-file "$PASSFILE" \
+              --output "$DL/worlds.tar.zst" --decrypt "$DL/worlds.enc" 2>"$DL/gpg-restore.log"; then
+            echo "::error::The backup integrity check or decryption failed. Check the Minecraft backup password; no files were extracted."
+            exit 1
+          fi
+          zstd --quiet --decompress --force "$DL/worlds.tar.zst" --output "$DL/worlds.tar"
+          mkdir -p "$MC_HOME"
+          python3 - "$DL/worlds.tar" "$MC_HOME" <<'PY'
+          import pathlib, sys, tarfile
+          archive, destination = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+          root = destination.resolve()
+          with tarfile.open(archive, mode='r:') as bundle:
+              members = bundle.getmembers()
+              for member in members:
+                  item = pathlib.PurePosixPath(member.name)
+                  if item.is_absolute() or '..' in item.parts or not item.parts or item.parts[0] != 'saves':
+                      raise SystemExit('::error::Backup archive contains an unsafe path; extraction was stopped.')
+                  if member.issym() or member.islnk() or member.isdev() or not (member.isfile() or member.isdir()):
+                      raise SystemExit('::error::Backup archive contains an unsupported filesystem entry.')
+                  if not (root / pathlib.Path(*item.parts)).resolve().is_relative_to(root):
+                      raise SystemExit('::error::Backup archive path escapes the Minecraft directory.')
+              bundle.extractall(destination, members=members, filter='data')
+          print('Selected world backup passed path checks and was extracted.')
+          PY
+          rm -f "$PASSFILE" "$DL/gpg-restore.log"
+          echo "World backup restored from the selected private Release."
+
+      - name: Start password-protected noVNC desktop and publish session info
+        id: viewer
+        if: ${{ steps.preflight.outcome == 'success' }}
+        env:
+          MC_VIEWER_PASSWORD: ${{ secrets.MINECRAFT_ACCESS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          WIDTH="${MC_RESOLUTION%x*}"
+          HEIGHT="${MC_RESOLUTION#*x}"
+          sudo sysctl -w net.ipv4.ip_unprivileged_port_start=0 >/dev/null
+          Xvfb :99 -screen 0 "${WIDTH}x${HEIGHT}x24" -nolisten tcp +extension GLX +render -noreset \
+            >"$RUNNER_TEMP/nova-minecraft-xvfb.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/nova-minecraft-xvfb.pid"
+          export DISPLAY=:99
+          for _ in $(seq 1 30); do
+            if xdpyinfo -display :99 >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          xdpyinfo -display :99 >/dev/null
+          openbox --display :99 >"$RUNNER_TEMP/nova-minecraft-openbox.log" 2>&1 &
+          x11vnc -display :99 -rfbport 5900 -listen 127.0.0.1 -forever -shared -nopw -noxdamage -repeat -xkb \
+            >"$RUNNER_TEMP/nova-minecraft-x11vnc.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/nova-minecraft-x11vnc.pid"
+          mkdir -p "$RUNNER_TEMP/nova-minecraft-web"
+          cat > "$RUNNER_TEMP/nova-minecraft-web/controller.html" <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+            <meta name="referrer" content="no-referrer">
+            <title>NOVA Minecraft Java Cloud</title>
+            <style>
+              html, body, #screen { width:100%; height:100%; margin:0; overflow:hidden; background:#07101d; }
+              canvas { outline:none; touch-action:none; }
+            </style>
+          </head>
+          <body>
+            <div id="screen" aria-label="Remote Minecraft Java desktop"></div>
+            <script type="module">
+              import RFB from '/core/rfb.js';
+              const screen = document.getElementById('screen');
+              const socketScheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+              const rfb = new RFB(screen, `${socketScheme}//${location.host}/websockify`);
+              rfb.scaleViewport = true;
+              rfb.viewOnly = false;
+              rfb.showDotCursor = true;
+              let pointerX = innerWidth / 2;
+              let pointerY = innerHeight / 2;
+              const status = value => { try { window.NovaBridge?.onStatus(value); } catch (_) {} };
+              rfb.addEventListener('connect', () => status('connected'));
+              rfb.addEventListener('disconnect', () => status('disconnected'));
+              rfb.addEventListener('credentialsrequired', () => status('credentials_required'));
+              status('connecting');
+
+              const mouse = (type, x, y, button, buttons) => {
+                const canvas = screen.querySelector('canvas');
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const event = new MouseEvent(type, {
+                  bubbles:true, cancelable:true, view:window,
+                  clientX:Math.min(rect.right - 1, Math.max(rect.left + 1, x)),
+                  clientY:Math.min(rect.bottom - 1, Math.max(rect.top + 1, y)),
+                  button, buttons
+                });
+                canvas.dispatchEvent(event);
+              };
+              window.novaController = {
+                key(name, down) {
+                  const keysyms = { w:0x77, a:0x61, s:0x73, d:0x64, e:0x65, q:0x71, t:0x74,
+                    '1':0x31, '2':0x32, '3':0x33, space:0x20, escape:0xff1b,
+                    shift:0xffe1, ctrl:0xffe3, f3:0xffc0, enter:0xff0d, backspace:0xff08 };
+                  if (Object.hasOwn(keysyms, name)) rfb.sendKey(keysyms[name], null, !!down);
+                },
+                move(dx, dy) {
+                  const rect = screen.getBoundingClientRect();
+                  pointerX = Math.min(rect.right - 2, Math.max(rect.left + 2, pointerX + dx * 1.5));
+                  pointerY = Math.min(rect.bottom - 2, Math.max(rect.top + 2, pointerY + dy * 1.5));
+                  mouse('mousemove', pointerX, pointerY, 0, 0);
+                },
+                click(button, down) {
+                  const right = button === 'right';
+                  const mask = right ? 2 : 1;
+                  mouse(down ? 'mousedown' : 'mouseup', pointerX, pointerY, right ? 2 : 0, down ? mask : 0);
+                },
+                typeText(text) {
+                  const shifted = { '!':'1', '@':'2', '#':'3', '$':'4', '%':'5', '^':'6', '&':'7', '*':'8',
+                    '(':'9', ')':'0', '_':'-', '+':'=', '{':'[', '}':']', '|':'\\', ':':';', '"':"'",
+                    '<':',', '>':'.', '?':'/' };
+                  for (const character of Array.from(String(text).slice(0, 2000))) {
+                    if (character === '\n' || character === '\r') {
+                      rfb.sendKey(0xff0d, null);
+                      continue;
+                    }
+                    const upper = character.length === 1 && character >= 'A' && character <= 'Z';
+                    const symbol = Object.prototype.hasOwnProperty.call(shifted, character);
+                    const base = upper ? character.toLowerCase() : (symbol ? shifted[character] : character);
+                    const codePoint = base.codePointAt(0);
+                    if (codePoint == null) continue;
+                    if (upper || symbol) rfb.sendKey(0xffe1, null, true);
+                    rfb.sendKey(codePoint <= 0xff ? codePoint : (0x01000000 | codePoint), null);
+                    if (upper || symbol) rfb.sendKey(0xffe1, null, false);
+                  }
+                },
+                status(value) { status(value); }
+              };
+              window.addEventListener('resize', () => {
+                pointerX = innerWidth / 2; pointerY = innerHeight / 2;
+              });
+            </script>
+          </body>
+          </html>
+          HTML
+          install -m 0644 "$RUNNER_TEMP/nova-minecraft-web/controller.html" /usr/share/novnc/controller.html
+          DOCKER_GATEWAY=$(ip -4 -o addr show docker0 | awk '{split($4,a,"/"); print a[1]; exit}')
+          [ -n "$DOCKER_GATEWAY" ] || { echo "::error::Docker bridge is unavailable; cannot keep the VNC service private."; exit 1; }
+          websockify --web=/usr/share/novnc "$DOCKER_GATEWAY:6080" 127.0.0.1:5900 \
+            >"$RUNNER_TEMP/nova-minecraft-websockify.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/nova-minecraft-websockify.pid"
+          for _ in $(seq 1 30); do
+            if curl --silent --fail "http://$DOCKER_GATEWAY:6080/controller.html" >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail "http://$DOCKER_GATEWAY:6080/controller.html" >/dev/null
+          docker network create nova-minecraft-net >/dev/null
+          docker pull --quiet caddy:2
+          docker pull --quiet cloudflare/cloudflared:latest
+          PASSWORD_HASH=$(docker run --rm caddy:2 caddy hash-password --plaintext "$MC_VIEWER_PASSWORD")
+          cat > "$RUNNER_TEMP/nova-minecraft-Caddyfile" <<'CADDY'
+          :8080 {
+            basic_auth {
+              nova {$MC_VIEWER_HASH}
+            }
+            reverse_proxy host.docker.internal:6080
+          }
+          CADDY
+          docker run -d --name nova-minecraft-caddy --network nova-minecraft-net \
+            --add-host=host.docker.internal:host-gateway \
+            -e MC_VIEWER_HASH="$PASSWORD_HASH" \
+            -v "$RUNNER_TEMP/nova-minecraft-Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2 >/dev/null
+          docker run -d --name nova-minecraft-tunnel --network nova-minecraft-net \
+            cloudflare/cloudflared:latest tunnel --no-autoupdate --url http://nova-minecraft-caddy:8080 >/dev/null
+          WEB_URL=""
+          for _ in $(seq 1 90); do
+            WEB_URL=$(docker logs nova-minecraft-tunnel 2>&1 \
+              | grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1 || true)
+            [ -n "$WEB_URL" ] && break
+            sleep 2
+          done
+          if [ -z "$WEB_URL" ]; then
+            echo "::error::Could not establish the authenticated HTTPS viewer tunnel."
+            docker logs --tail 40 nova-minecraft-tunnel 2>&1 || true
+            exit 1
+          fi
+          printf 'WEB_URL=%s\nMC_VERSION=%s\nSTARTED_AT=%s\n' \
+            "$WEB_URL" "$MC_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > "$RUNNER_TEMP/minecraft-session-info.txt"
+          mkdir -p "$RUNNER_TEMP/minecraft-session-info"
+          mv "$RUNNER_TEMP/minecraft-session-info.txt" "$RUNNER_TEMP/minecraft-session-info/info.txt"
+          {
+            echo "## Minecraft Java Cloud viewer is protected and online"
+            echo ""
+            echo "The temporary viewer uses HTTPS, Caddy Basic Authentication, and the configured MINECRAFT_ACCESS_PASSWORD."
+            echo "Open the session from NOVA; the password is not included in this artifact or log."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Minecraft viewer tunnel is ready (URL omitted from logs)."
+
+      - name: Publish protected viewer connection details
+        if: ${{ steps.viewer.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-session-info
+          path: ${{ runner.temp }}/minecraft-session-info/info.txt
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Authenticate Microsoft account, install, and run Minecraft Java
+        id: launch
+        if: ${{ steps.viewer.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MINECRAFT_VERSION: ${{ inputs.version }}
+          MINECRAFT_MEMORY_GB: ${{ inputs.memory_gb }}
+          MINECRAFT_RESOLUTION: ${{ inputs.resolution }}
+          MINECRAFT_RENDER_DISTANCE: ${{ inputs.render_distance }}
+          MINECRAFT_FPS_LIMIT: ${{ inputs.fps_limit }}
+          MINECRAFT_HOURS: ${{ inputs.hours }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DISPLAY=:99
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+          cat > "$RUNNER_TEMP/nova-minecraft-launcher.py" <<'PY'
+          import http.server
+          import json
+          import os
+          import pathlib
+          import queue
+          import re
+          import shutil
+          import signal
+          import subprocess
+          import sys
+          import threading
+          import time
+          import urllib.parse
+          import urllib.request
+
+          import minecraft_launcher_lib as minecraft
+
+          CLIENT_ID = os.environ['MICROSOFT_CLIENT_ID']
+          REDIRECT_URI = 'http://localhost:47831'
+          MC_DIR = pathlib.Path(os.environ['MC_HOME'])
+          VERSION = os.environ['MINECRAFT_VERSION']
+          OAUTH_PORT = 47831
+          stop_tag = f"nova-minecraft-stop-{os.environ['GITHUB_RUN_ID']}"
+
+          def progress_status(message):
+              clean = re.sub(r'https?://\S+', '[official download]', str(message))
+              print('[Minecraft install] ' + clean[:180], flush=True)
+
+          def open_microsoft_login(url):
+              profile = os.path.join(os.environ['RUNNER_TEMP'], 'nova-minecraft-browser')
+              chrome_flags = [
+                  '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+                  '--user-data-dir=' + profile, '--incognito', '--no-first-run', '--disable-sync',
+              ]
+              candidates = [
+                  ('google-chrome-stable', chrome_flags),
+                  ('google-chrome', chrome_flags),
+                  ('chromium', chrome_flags),
+                  ('firefox', ['--no-remote', '--profile', profile]),
+              ]
+              browser_env = os.environ.copy()
+              for key in list(browser_env):
+                  if key.startswith(('GITHUB_', 'RUNNER_')) or key in ('GH_TOKEN', 'GITHUB_TOKEN'):
+                      browser_env.pop(key, None)
+              for name, flags in candidates:
+                  executable = shutil.which(name)
+                  if executable:
+                      return subprocess.Popen(
+                          [executable, *flags, '--new-window', url],
+                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL, start_new_session=True,
+                          close_fds=True, env=browser_env,
+                      )
+              raise RuntimeError('No supported graphical browser is installed on the runner.')
+
+          class ReusableHTTPServer(http.server.HTTPServer):
+              allow_reuse_address = True
+
+          def microsoft_login():
+              callback_queue = queue.Queue(maxsize=1)
+              class CallbackHandler(http.server.BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      parsed = urllib.parse.urlparse(self.path)
+                      query = urllib.parse.parse_qs(parsed.query)
+                      if parsed.path != '/':
+                          self.send_error(404)
+                          return
+                      if 'error' in query:
+                          callback_queue.put({'error': True})
+                          page = b'<html><title>Sign-in not completed</title><body>Return to NOVA and try again.</body></html>'
+                      elif 'code' in query and 'state' in query:
+                          callback_queue.put({'url': REDIRECT_URI + self.path})
+                          page = b'<html><title>Microsoft sign-in complete</title><body>Sign-in complete. You may return to NOVA.</body></html>'
+                      else:
+                          self.send_error(400)
+                          return
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'text/html; charset=utf-8')
+                      self.send_header('Cache-Control', 'no-store')
+                      self.send_header('Referrer-Policy', 'no-referrer')
+                      self.end_headers()
+                      self.wfile.write(page)
+                  def log_message(self, *_args):
+                      return
+
+              for attempt in range(1, 4):
+                  login_url, state, verifier = minecraft.microsoft_account.get_secure_login_data(
+                      CLIENT_ID, REDIRECT_URI
+                  )
+                  server = ReusableHTTPServer(('127.0.0.1', OAUTH_PORT), CallbackHandler)
+                  thread = threading.Thread(target=server.serve_forever, daemon=True)
+                  thread.start()
+                  browser_process = None
+                  try:
+                      browser_process = open_microsoft_login(login_url)
+                      print(f'[Microsoft sign-in] Complete the official account sign-in in the remote desktop (attempt {attempt}/3).', flush=True)
+                      result = callback_queue.get(timeout=300)
+                      if 'error' in result:
+                          print('[Microsoft sign-in] The account flow was declined; starting a fresh PKCE attempt.', flush=True)
+                          continue
+                      code = minecraft.microsoft_account.parse_auth_code_url(result['url'], state)
+                      account = minecraft.microsoft_account.complete_login(
+                          CLIENT_ID, None, REDIRECT_URI, code, verifier
+                      )
+                      if not account.get('access_token') or not account.get('id') or not account.get('name'):
+                          raise RuntimeError('Microsoft did not return a playable Minecraft profile.')
+                      print('[Microsoft sign-in] Microsoft/Xbox/Minecraft profile and ownership checks passed.', flush=True)
+                      return account
+                  except queue.Empty:
+                      print('[Microsoft sign-in] Timed out waiting for the local OAuth callback.', flush=True)
+                  except Exception as error:
+                      print(f'[Microsoft sign-in] Authentication failed ({type(error).__name__}); verify the public-client app and eligible Java Edition account.', flush=True)
+                  finally:
+                      server.shutdown()
+                      server.server_close()
+                      thread.join(timeout=2)
+                      if browser_process is not None and browser_process.poll() is None:
+                          try:
+                              os.killpg(browser_process.pid, signal.SIGTERM)
+                          except ProcessLookupError:
+                              pass
+                          try:
+                              browser_process.wait(timeout=10)
+                          except subprocess.TimeoutExpired:
+                              try:
+                                  os.killpg(browser_process.pid, signal.SIGKILL)
+                                  browser_process.wait(timeout=5)
+                              except (ProcessLookupError, subprocess.TimeoutExpired):
+                                  pass
+                      shutil.rmtree(os.path.join(os.environ['RUNNER_TEMP'], 'nova-minecraft-browser'), ignore_errors=True)
+              raise RuntimeError('Official Microsoft sign-in did not complete after three attempts.')
+
+          def version_java_major():
+              versions_url = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
+              with urllib.request.urlopen(versions_url, timeout=30) as response:
+                  manifest = json.load(response)
+              entry = next((item for item in manifest.get('versions', []) if item.get('id') == VERSION), None)
+              if not entry or entry.get('type') not in ('release', 'snapshot'):
+                  raise RuntimeError('The selected version is not in Mojang’s official version manifest.')
+              metadata_url = entry.get('url', '')
+              parsed = urllib.parse.urlparse(metadata_url)
+              if parsed.scheme != 'https' or parsed.hostname != 'piston-meta.mojang.com':
+                  raise RuntimeError('Mojang returned an unexpected version metadata URL.')
+              with urllib.request.urlopen(metadata_url, timeout=30) as response:
+                  metadata = json.load(response)
+              major = metadata.get('javaVersion', {}).get('majorVersion', 8)
+              if not isinstance(major, int):
+                  major = 8
+              runtime = next((candidate for candidate in (8, 11, 17, 21, 25) if candidate >= major), None)
+              if runtime is None:
+                  raise RuntimeError(f'This workflow supports Java requirements through Java 25, not Java {major}.')
+              return runtime
+
+          def write_game_options():
+              MC_DIR.mkdir(parents=True, exist_ok=True)
+              path = MC_DIR / 'options.txt'
+              existing = {}
+              if path.exists():
+                  for line in path.read_text(encoding='utf-8', errors='replace').splitlines():
+                      if ':' in line:
+                          key, value = line.split(':', 1)
+                          existing[key] = value
+              width, height = os.environ['MINECRAFT_RESOLUTION'].split('x')
+              existing.update({
+                  'renderDistance': os.environ['MINECRAFT_RENDER_DISTANCE'],
+                  'maxFps': os.environ['MINECRAFT_FPS_LIMIT'],
+                  'graphicsMode': '0',
+                  'fullscreen': 'false',
+                  'enableVsync': 'false',
+                  'simulationDistance': '5',
+                  'entityDistanceScaling': '0.5',
+              })
+              path.write_text(''.join(f'{key}:{value}\n' for key, value in existing.items()), encoding='utf-8')
+              return width, height
+
+          def stop_requested():
+              result = subprocess.run(
+                  ['gh', 'release', 'view', stop_tag, '--repo', os.environ['GITHUB_REPOSITORY'],
+                   '--json', 'tagName'],
+                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL, timeout=15,
+              )
+              return result.returncode == 0
+
+          def terminate_game(process):
+              if process.poll() is not None:
+                  return process.returncode, True
+              print('[Minecraft session] Sending graceful SIGTERM so the client can flush local worlds.', flush=True)
+              try:
+                  os.killpg(process.pid, signal.SIGTERM)
+                  return process.wait(timeout=120), True
+              except subprocess.TimeoutExpired:
+                  print('[Minecraft session] Graceful close timed out; allowing a final 30-second shutdown window.', flush=True)
+                  try:
+                      process.terminate()
+                      return process.wait(timeout=30), True
+                  except subprocess.TimeoutExpired:
+                      print('[Minecraft session] The client did not exit cleanly; forcing process termination.', flush=True)
+                      os.killpg(process.pid, signal.SIGKILL)
+                      return process.wait(timeout=10), False
+
+          def main():
+              if not re.fullmatch(r'[A-Za-z0-9._+-]{1,40}', VERSION):
+                  raise RuntimeError('Invalid Minecraft version ID.')
+              java_major = version_java_major()
+              java_home = pathlib.Path(os.environ.get(f'JAVA_HOME_{java_major}_X64', ''))
+              java = java_home / 'bin' / 'java'
+              if not java.is_file():
+                  raise RuntimeError(f'The configured Java {java_major} runtime is not available.')
+
+              account = microsoft_login()
+              print(f'[Minecraft install] Installing official Java Edition {VERSION} and verified dependencies.', flush=True)
+              callback = {'setStatus': progress_status}
+              minecraft.install.install_minecraft_version(VERSION, str(MC_DIR), callback=callback)
+              width, height = write_game_options()
+              access_token = account.pop('access_token')
+              account.pop('refresh_token', None)
+              options = {
+                  'username': account['name'],
+                  'uuid': account['id'],
+                  'token': access_token,
+                  'user_type': 'msa',
+                  'executablePath': str(java),
+                  'defaultExecutablePath': str(java),
+                  'gameDirectory': str(MC_DIR),
+                  'jvmArguments': [
+                      '-Xms512M', f'-Xmx{os.environ["MINECRAFT_MEMORY_GB"]}G',
+                      '-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true',
+                  ],
+                  'customResolution': True,
+                  'resolutionWidth': width,
+                  'resolutionHeight': height,
+                  'launcherName': 'NOVA Minecraft Java Cloud',
+                  'launcherVersion': '1.0',
+              }
+              command = minecraft.command.get_minecraft_command(VERSION, str(MC_DIR), options)
+              child_env = os.environ.copy()
+              for key in list(child_env):
+                  if key.startswith(('GITHUB_', 'RUNNER_')) or key in ('GH_TOKEN', 'GITHUB_TOKEN'):
+                      child_env.pop(key, None)
+              with open(os.devnull, 'wb') as quiet_output:
+                  process = subprocess.Popen(
+                      command, cwd=str(MC_DIR), env=child_env,
+                      stdin=subprocess.DEVNULL, stdout=quiet_output, stderr=subprocess.STDOUT,
+                      start_new_session=True, close_fds=True,
+                  )
+              del command, options, account, access_token
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+                  output.write('game_started=true\n')
+              print('[Minecraft session] Java process started; waiting for a clean exit or the app stop signal.', flush=True)
+
+              job_start = int(os.environ['NOVA_MC_JOB_START'])
+              requested_end = time.time() + int(os.environ['MINECRAFT_HOURS']) * 3600
+              hard_end = job_start + (358 - 45) * 60
+              end_at = min(requested_end, hard_end)
+              last_heartbeat = 0
+              termination_reason = None
+              clean_shutdown = True
+              while process.poll() is None:
+                  now = time.time()
+                  if now >= end_at:
+                      print('[Minecraft session] Requested duration reached; saving before the Actions job deadline.', flush=True)
+                      _, clean_shutdown = terminate_game(process)
+                      termination_reason = 'duration'
+                      break
+                  if now - last_heartbeat >= 600:
+                      print(f'[Minecraft session] Running; approximately {int((end_at - now) / 60)} minutes remain.', flush=True)
+                      last_heartbeat = now
+                  try:
+                      if stop_requested():
+                          print('[Minecraft session] Stop request received from NOVA.', flush=True)
+                          _, clean_shutdown = terminate_game(process)
+                          termination_reason = 'user_stop'
+                          try:
+                              subprocess.run(
+                                  ['gh', 'release', 'delete', stop_tag, '--cleanup-tag', '--yes',
+                                   '--repo', os.environ['GITHUB_REPOSITORY']],
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL, timeout=30,
+                              )
+                          except Exception:
+                              pass
+                          break
+                  except subprocess.TimeoutExpired:
+                      print('[Minecraft session] GitHub stop-signal check timed out; the game remains available.', flush=True)
+                  time.sleep(20)
+
+              return_code = process.wait()
+              if not clean_shutdown:
+                  raise RuntimeError('Minecraft required forced termination; the backup may not contain the latest world state.')
+              if return_code != 0 and termination_reason is None:
+                  print(f'[Minecraft session] Client exited unexpectedly with status {return_code}; the workflow will still attempt a world snapshot.', flush=True)
+                  raise RuntimeError(f'Minecraft exited unexpectedly with status {return_code}.')
+              if termination_reason is not None:
+                  print(f'[Minecraft session] Session stopped cleanly ({termination_reason}); world files are ready for an offline snapshot.', flush=True)
+              else:
+                  print('[Minecraft session] Minecraft client exited cleanly; world files are ready for an offline snapshot.', flush=True)
+
+          if __name__ == '__main__':
+              try:
+                  main()
+              except Exception as error:
+                  print(f'::error::Minecraft setup or launch failed ({type(error).__name__}). Review the preceding safe status messages and the GitHub Actions run.', flush=True)
+                  raise SystemExit(1)
+          PY
+          "$MC_VENV/bin/python" "$RUNNER_TEMP/nova-minecraft-launcher.py"
+
+      - name: Create integrity-checked encrypted world snapshot
+        id: backup
+        if: ${{ always() && steps.launch.outputs.game_started == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MC_BACKUP_PASSWORD: ${{ secrets.MINECRAFT_BACKUP_PASSWORD }}
+          MC_VERSION_INPUT: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_TOKEN="$GH_TOKEN"
+          BACKUP_PASSWORD="$MC_BACKUP_PASSWORD"
+          unset GH_TOKEN GITHUB_TOKEN MC_BACKUP_PASSWORD
+          SAVES="$MC_HOME/saves"
+          if [ ! -d "$SAVES" ] || ! find "$SAVES" -mindepth 1 -maxdepth 1 -type d -print -quit | grep -q .; then
+            echo "::warning::No saved Java worlds were found; no empty backup Release was created."
+            exit 0
+          fi
+          WORK="$RUNNER_TEMP/nova-minecraft-backup"
+          mkdir -p "$WORK" "$RUNNER_TEMP/nova-minecraft-gpg"
+          chmod 700 "$RUNNER_TEMP/nova-minecraft-gpg"
+          PASSFILE="$RUNNER_TEMP/nova-minecraft-gpg/passphrase"
+          printf '%s' "$BACKUP_PASSWORD" > "$PASSFILE"
+          chmod 600 "$PASSFILE"
+          unset BACKUP_PASSWORD
+          ARCHIVE="$WORK/worlds.tar.zst"
+          ENCRYPTED="$WORK/worlds.enc"
+          tar -C "$MC_HOME" -cf - saves | zstd --quiet --threads=0 --fast=3 --output="$ARCHIVE"
+          gpg --batch --yes --pinentry-mode loopback --passphrase-file "$PASSFILE" \
+            --symmetric --cipher-algo AES256 --s2k-digest-algo SHA512 --s2k-count 65011712 \
+            --output "$ENCRYPTED" "$ARCHIVE"
+          sha256sum "$ENCRYPTED" | awk '{print $1 "  worlds.enc"}' > "$WORK/worlds.enc.sha256"
+          python3 - "$SAVES" "$MC_VERSION_INPUT" "$WORK/worlds.json" <<'PY'
+          import json, pathlib, sys
+          saves, version, output = pathlib.Path(sys.argv[1]), sys.argv[2], pathlib.Path(sys.argv[3])
+          worlds = []
+          for path in sorted(saves.iterdir(), key=lambda item: item.name.casefold()):
+              if not path.is_dir():
+                  continue
+              size = sum(item.stat().st_size for item in path.rglob('*') if item.is_file())
+              worlds.append({'name': path.name, 'size_bytes': size})
+          output.write_text(json.dumps({'minecraft_version': version, 'worlds': worlds}, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+          PY
+          NAMES_JSON=$(python3 - "$WORK/worlds.json" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding='utf-8'))
+          print(json.dumps([world['name'] for world in data['worlds']], ensure_ascii=False, separators=(',', ':')))
+          PY
+          )
+          WORLD_COUNT=$(python3 - "$WORK/worlds.json" <<'PY'
+          import json, sys
+          print(len(json.load(open(sys.argv[1], encoding='utf-8'))['worlds']))
+          PY
+          )
+          NEW_TAG="minecraft-world-$(date -u +%Y%m%d-%H%M%S)-${GITHUB_RUN_ID}"
+          NOTES="NOVA_MINECRAFT_VERSION=$MC_VERSION_INPUT
+          NOVA_MINECRAFT_WORLDS=$NAMES_JSON
+          Minecraft Java world snapshot for version $MC_VERSION_INPUT.
+          The archive uses GPG symmetric AES-256 encryption, GPG integrity protection, and a separate SHA-256 checksum.
+          Backups are retained; remove only from GitHub after exporting a copy."
+          GH_TOKEN="$RELEASE_TOKEN" gh release create "$NEW_TAG" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "Minecraft worlds — $WORLD_COUNT world(s)" --notes "$NOTES" --prerelease
+          split -b 1800M -d -a 3 "$ENCRYPTED" "$WORK/worlds.enc.part"
+          upload_with_retry() {
+            local file="$1"
+            for attempt in 1 2 3 4 5 6; do
+              if GH_TOKEN="$RELEASE_TOKEN" gh release upload "$NEW_TAG" "$file" --repo "$GITHUB_REPOSITORY" --clobber; then
+                return 0
+              fi
+              echo "Upload retry $attempt for $(basename "$file")" >&2
+              sleep 15
+            done
+            return 1
+          }
+          for part in "$WORK"/worlds.enc.part*; do upload_with_retry "$part"; done
+          upload_with_retry "$WORK/worlds.enc.sha256"
+          upload_with_retry "$WORK/worlds.json"
+          printf 'created_at=%s\nversion=%s\nworld_count=%s\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$MC_VERSION_INPUT" "$WORLD_COUNT" \
+            > "$WORK/COMPLETE"
+          upload_with_retry "$WORK/COMPLETE"
+          rm -f "$PASSFILE" "$ARCHIVE" "$ENCRYPTED"
+          unset RELEASE_TOKEN
+          echo "Encrypted Minecraft world backup completed: $NEW_TAG"
+          {
+            echo ""
+            echo "### Minecraft Java worlds saved"
+            echo "Release: \`$NEW_TAG\` — $WORLD_COUNT world(s)."
+            echo "The runner disk is temporary; this verified, encrypted Release is the persistent copy."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop protected viewer and clean temporary credentials
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          docker rm -f nova-minecraft-tunnel nova-minecraft-caddy >/dev/null 2>&1
+          for pidfile in \
+            "$RUNNER_TEMP/nova-minecraft-websockify.pid" \
+            "$RUNNER_TEMP/nova-minecraft-x11vnc.pid" \
+            "$RUNNER_TEMP/nova-minecraft-xvfb.pid"; do
+            if [ -s "$pidfile" ]; then kill "$(cat "$pidfile")" >/dev/null 2>&1; rm -f "$pidfile"; fi
+          done
+          rm -rf "$RUNNER_TEMP/nova-minecraft-gpg" "$RUNNER_TEMP/nova-minecraft-restore" \
+            "$RUNNER_TEMP/nova-minecraft-backup" "$RUNNER_TEMP/nova-minecraft-web" \
+            "$RUNNER_TEMP/nova-minecraft-browser" "$RUNNER_TEMP/nova-minecraft-venv" \
+            "$RUNNER_TEMP/nova-minecraft-launcher.py"
+          echo "Temporary viewer and backup credential files were removed."

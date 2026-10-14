@@ -104,6 +104,10 @@ class AppState extends ChangeNotifier {
   int? runId;
   DateTime? runStartedAt;
   int dispatchedHours = 4;
+  int sessionHours = 4;
+  bool sessionFreshInstall = false;
+  bool webAccessEnabled = true;
+  bool rdpEnabled = true;
   SessionInfo? sessionInfo;
 
   /// Only kept in RAM so the Ready screen can reveal/copy it. Never persisted.
@@ -140,6 +144,19 @@ class AppState extends ChangeNotifier {
 
   void setJustLoggedIn(bool v) {
     justLoggedIn = v;
+    notifyListeners();
+  }
+
+  void updateSessionOptions({
+    int? hours,
+    bool? fresh,
+    bool? webAccess,
+    bool? enableRdp,
+  }) {
+    if (hours != null) sessionHours = hours.clamp(1, Const.maxSessionHours).toInt();
+    if (fresh != null) sessionFreshInstall = fresh;
+    if (webAccess != null) webAccessEnabled = webAccess;
+    if (enableRdp != null) rdpEnabled = enableRdp;
     notifyListeners();
   }
 
@@ -679,8 +696,11 @@ class AppState extends ChangeNotifier {
         runId = latestRun!['id'] as int?;
         final startedStr = latestRun['run_started_at'] as String? ?? latestRun['created_at'] as String? ?? '';
         runStartedAt = DateTime.tryParse(startedStr) ?? runStartedAt;
-        if (runId != null) {
+        final expectsAccessRoute = webAccessEnabled || (rdpEnabled && hasTailscaleSecret);
+        if (runId != null && expectsAccessRoute) {
           sessionInfo = await currentApi.sessionInfo(r.fullName, runId!);
+        } else {
+          sessionInfo = null;
         }
       } else {
         runId = null;
@@ -847,16 +867,19 @@ class AppState extends ChangeNotifier {
     required int hours,
     required bool fresh,
     bool isRestore = false,
+    bool webAccess = true,
+    bool enableRdp = true,
   }) async {
     final r = selectedRepo;
     if (r == null || api == null) {
       throw StateError('No repository selected');
     }
     final actionKey = isRestore ? 'act_restore_backup' : 'act_start_run';
+    final sessionLength = hours.clamp(1, Const.maxSessionHours).toInt();
 
     try {
       // Automatically install or repair `.github/workflows/windows11.yml` if missing or outdated!
-      if (workflowFile == null || workflowNeedsRepair) {
+      if (workflowFile != Const.workflowFile || workflowNeedsRepair) {
         final yaml = await rootBundle.loadString('assets/windows11.yml');
         await api!.createWorkflowFile(r.fullName, r.defaultBranch, yaml);
         workflowFile = Const.workflowFile;
@@ -864,7 +887,7 @@ class AppState extends ChangeNotifier {
         await log('act_install_workflow', true, detail: r.fullName);
       }
 
-      dispatchedHours = hours;
+      dispatchedHours = sessionLength;
       runStartedAt = DateTime.now().toUtc();
       runId = null;
       sessionInfo = null;
@@ -872,11 +895,17 @@ class AppState extends ChangeNotifier {
       await api!.dispatch(
         r.fullName,
         workflowFile ?? Const.workflowFile,
-        hours: hours,
+        hours: sessionLength,
         fresh: fresh,
+        webAccess: webAccess,
+        enableRdp: enableRdp,
         branch: r.defaultBranch,
       );
-      await log(actionKey, true, detail: '${r.fullName} (${hours}h)');
+      sessionHours = sessionLength;
+      sessionFreshInstall = fresh;
+      webAccessEnabled = webAccess;
+      rdpEnabled = enableRdp;
+      await log(actionKey, true, detail: '${r.fullName} (${sessionLength}h)');
       notifyListeners();
     } catch (e) {
       await log(actionKey, false, detail: '${r.fullName} (${_sanitizeLogDetail('$e')})');

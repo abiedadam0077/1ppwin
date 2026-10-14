@@ -23,12 +23,20 @@ class Const {
 
   /// The workflow file this app drives (must exist in the selected repo).
   static const String workflowFile = 'windows11.yml';
+  static const String minecraftWorkflowFile = 'minecraft-cloud.yml';
   static const String backupPrefix = 'win11-backup';
+  static const String minecraftBackupPrefix = 'minecraft-world-';
 
-  /// Secrets managed by the app.
+  /// Secrets managed by the Windows Cloud workflow.
   static const String secretAccess = 'ACCESS_PASSWORD';
   static const String secretBackup = 'BACKUP_PASSWORD';
   static const String secretTailscale = 'TAILSCALE_AUTHKEY';
+
+  /// Minecraft Java Cloud uses a user-owned Microsoft public-client ID and
+  /// separate secrets for its protected viewer and encrypted world snapshots.
+  static const String secretMinecraftClientId = 'MICROSOFT_CLIENT_ID';
+  static const String secretMinecraftAccess = 'MINECRAFT_ACCESS_PASSWORD';
+  static const String secretMinecraftBackup = 'MINECRAFT_BACKUP_PASSWORD';
 
   static const int maxSessionHours = 5;
 }

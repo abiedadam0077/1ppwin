@@ -62,9 +62,13 @@ class PermissionsGuideCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: NovaTheme.danger.withOpacity(0.5)),
               ),
-              child: Text(
-                errorDetail!,
-                style: const TextStyle(color: NovaTheme.danger, fontSize: 11.5),
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: Text(
+                  errorDetail!,
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(color: NovaTheme.danger, fontSize: 11.5),
+                ),
               ),
             ),
           ],
@@ -152,6 +156,89 @@ class _SecurityScreenState extends State<SecurityScreen> {
     return hasA && hasB && anyEntered;
   }
 
+  Future<void> _confirmCopyPasswords(L10n t) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.content_copy_rounded, color: NovaTheme.warn),
+        title: Text(t.t('copy_sensitive_confirm_title')),
+        content: Text(t.t('copy_sensitive_confirm_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.copy_rounded),
+            label: Text(t.t('copy_sensitive_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final buf = StringBuffer();
+    if (_access.text.isNotEmpty) buf.writeln('ACCESS_PASSWORD=${_access.text}');
+    if (_backup.text.isNotEmpty) buf.writeln('BACKUP_PASSWORD=${_backup.text}');
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(t.t('passwords_copied'))),
+    );
+  }
+
+  Future<void> _confirmSave(AppState st, L10n t) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.lock_outline_rounded, color: NovaTheme.warn),
+        title: Text(t.t('save_secrets_confirm_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.t('save_secrets_confirm_body')),
+            const SizedBox(height: 10),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: SelectableText(
+                st.selectedRepo?.fullName ?? '',
+                textAlign: TextAlign.left,
+                style: const TextStyle(color: NovaTheme.neonCyan, fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 7,
+              runSpacing: 6,
+              children: [
+                if (_access.text.trim().isNotEmpty)
+                  StatusBadge(label: t.t('access_password'), color: NovaTheme.neonCyan),
+                if (_backup.text.trim().isNotEmpty)
+                  StatusBadge(label: t.t('backup_password'), color: NovaTheme.neonCyan),
+                if (_ts.text.trim().isNotEmpty)
+                  StatusBadge(label: t.t('tailscale_key'), color: NovaTheme.neonCyan),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(t.t('cancel')),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.cloud_upload_outlined),
+            label: Text(t.t('save_secrets_confirm_action')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) await _save(st, t);
+  }
+
   Future<void> _save(AppState st, L10n t) async {
     setState(() {
       _busy = true;
@@ -222,96 +309,24 @@ class _SecurityScreenState extends State<SecurityScreen> {
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: GlassCard(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.folder_off_outlined, color: NovaTheme.warn, size: 42),
-                        const SizedBox(height: 12),
-                        Text(
-                          t.t('no_repo_selected'),
-                          style: const TextStyle(color: NovaTheme.text, fontSize: 16, fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          t.t('no_repo_selected_sub'),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: NovaTheme.textDim, fontSize: 13),
-                        ),
-                        const SizedBox(height: 16),
-                        GradientButton(
-                          label: t.t('choose_repo'),
-                          icon: Icons.folder_open,
-                          onPressed: () => Navigator.pushReplacementNamed(context, '/repos'),
-                        ),
-                      ],
+                  child: NovaEmptyState(
+                    icon: Icons.folder_off_outlined,
+                    title: t.t('no_repo_selected'),
+                    subtitle: t.t('no_repo_selected_sub'),
+                    color: NovaTheme.warn,
+                    action: GradientButton(
+                      label: t.t('choose_repo'),
+                      icon: Icons.folder_open,
+                      onPressed: () => Navigator.pushReplacementNamed(context, '/repos'),
                     ),
                   ),
                 ),
               )
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Selected repository & current secret status card
-                    GlassCard(
-                      borderColor: st.secretsReady ? NovaTheme.ok.withOpacity(0.6) : NovaTheme.cardBorder,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.inventory_2_outlined, color: NovaTheme.neonCyan, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  repo.fullName,
-                                  style: const TextStyle(
-                                    color: NovaTheme.text,
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              StatusBadge(
-                                label: st.secretsReady ? t.t('ready') : t.t('needs_secrets'),
-                                color: st.secretsReady ? NovaTheme.ok : NovaTheme.warn,
-                                icon: st.secretsReady ? Icons.verified_user : Icons.lock_clock,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            t.t('security_sub'),
-                            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12.5, height: 1.4),
-                          ),
-                          const Divider(color: NovaTheme.cardBorder, height: 22),
-                          _secretStatusRow(
-                            Const.secretAccess,
-                            st.hasAccessSecret,
-                            requiredSecret: true,
-                            t: t,
-                          ),
-                          const SizedBox(height: 8),
-                          _secretStatusRow(
-                            Const.secretBackup,
-                            st.hasBackupSecret,
-                            requiredSecret: true,
-                            t: t,
-                          ),
-                          const SizedBox(height: 8),
-                          _secretStatusRow(
-                            Const.secretTailscale,
-                            st.hasTailscaleSecret,
-                            requiredSecret: false,
-                            t: t,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
                     if (st.secretsPermissionDenied || _localError != null) ...[
                       PermissionsGuideCard(
                         errorDetail: _localError ?? st.secretsError,
@@ -320,16 +335,75 @@ class _SecurityScreenState extends State<SecurityScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // Secret input fields
+                    // Repository context, live secret status, and editor share one form card.
                     GlassCard(
+                      padding: const EdgeInsets.all(14),
+                      borderColor: st.secretsReady ? NovaTheme.ok.withOpacity(0.55) : NovaTheme.cardBorder,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.inventory_2_outlined, color: NovaTheme.neonCyan, size: 19),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Directionality(
+                                  textDirection: TextDirection.ltr,
+                                  child: Text(
+                                    repo.fullName,
+                                    textAlign: TextAlign.left,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: NovaTheme.text,
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              StatusBadge(
+                                label: st.secretsReady ? t.t('ready') : t.t('needs_secrets'),
+                                color: st.secretsReady ? NovaTheme.ok : NovaTheme.warn,
+                                icon: st.secretsReady ? Icons.verified_user : Icons.lock_clock,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            t.t('security_sub'),
+                            style: const TextStyle(color: NovaTheme.textDim, fontSize: 12, height: 1.35),
+                          ),
+                          const Divider(color: NovaTheme.cardBorder, height: 20),
+                          _secretStatusRow(
+                            Const.secretAccess,
+                            st.hasAccessSecret,
+                            requiredSecret: true,
+                            t: t,
+                          ),
+                          const SizedBox(height: 5),
+                          _secretStatusRow(
+                            Const.secretBackup,
+                            st.hasBackupSecret,
+                            requiredSecret: true,
+                            t: t,
+                          ),
+                          const SizedBox(height: 5),
+                          _secretStatusRow(
+                            Const.secretTailscale,
+                            st.hasTailscaleSecret,
+                            requiredSecret: false,
+                            t: t,
+                          ),
+                          const Divider(color: NovaTheme.cardBorder, height: 20),
                           NeonField(
                             label: t.t('access_password'),
                             hint: st.hasAccessSecret ? t.t('keep_existing_hint') : t.t('required_secret_hint'),
                             controller: _access,
                             obscure: !_showA,
+                            textDirection: TextDirection.ltr,
+                            keyboardType: TextInputType.visiblePassword,
                             prefixIcon: Icons.lock_person_outlined,
                             onChanged: (_) => setState(() {}),
                             suffix: IconButton(
@@ -344,6 +418,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
                             hint: st.hasBackupSecret ? t.t('keep_existing_hint') : t.t('required_secret_hint'),
                             controller: _backup,
                             obscure: !_showB,
+                            textDirection: TextDirection.ltr,
+                            keyboardType: TextInputType.visiblePassword,
                             prefixIcon: Icons.enhanced_encryption_outlined,
                             onChanged: (_) => setState(() {}),
                             suffix: IconButton(
@@ -358,6 +434,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
                             hint: 'tskey-auth-...',
                             controller: _ts,
                             obscure: !_showTs,
+                            textDirection: TextDirection.ltr,
+                            keyboardType: TextInputType.visiblePassword,
                             prefixIcon: Icons.router_outlined,
                             onChanged: (_) => setState(() {}),
                             suffix: IconButton(
@@ -391,19 +469,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                               ),
                               if (_access.text.isNotEmpty || _backup.text.isNotEmpty)
                                 TextButton.icon(
-                                  onPressed: () {
-                                    final buf = StringBuffer();
-                                    if (_access.text.isNotEmpty) {
-                                      buf.writeln('ACCESS_PASSWORD=${_access.text}');
-                                    }
-                                    if (_backup.text.isNotEmpty) {
-                                      buf.writeln('BACKUP_PASSWORD=${_backup.text}');
-                                    }
-                                    Clipboard.setData(ClipboardData(text: buf.toString()));
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(t.t('passwords_copied'))),
-                                    );
-                                  },
+                                onPressed: () => _confirmCopyPasswords(t),
                                   icon: const Icon(Icons.copy, size: 16, color: NovaTheme.textDim),
                                   label: Text(
                                     t.t('copy_passwords'),
@@ -420,7 +486,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                       label: t.t('save_settings'),
                       icon: Icons.cloud_upload_rounded,
                       busy: _busy,
-                      onPressed: _canSave(st) ? () => _save(st, t) : null,
+                      onPressed: _canSave(st) ? () => _confirmSave(st, t) : null,
                     ),
                   ],
                 ),
@@ -459,12 +525,16 @@ class _SecurityScreenState extends State<SecurityScreen> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            name,
-            style: const TextStyle(
-              color: NovaTheme.text,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Text(
+              name,
+              textAlign: TextAlign.left,
+              style: const TextStyle(
+                color: NovaTheme.text,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),

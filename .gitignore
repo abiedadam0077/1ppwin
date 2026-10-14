@@ -18,6 +18,8 @@ android/app/profile/
 android/app/release/
 *.jks
 *.keystore
+*.jks.base64
+*.keystore.base64
 
 # Editors and local environment
 __pycache__/

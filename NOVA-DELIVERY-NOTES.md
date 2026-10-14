@@ -6,33 +6,37 @@ The Flutter/Android source was recovered from the user's
 `nova-app-bundle.tar.gz` Google Drive archive and imported at the repository
 root. The original `.github/workflows/windows11.yml` is preserved.
 
-This session uses `arena/2df8bb0b-1ppwin`, with squash-merged pull requests
+This session uses `arena/2ea97602-1ppwin`, with pull requests from that branch
 into `main`. Keep fixes on that session branch; do not push directly to main
 or delete the session branch. Downloaded archives, APKs, caches and CI logs
 are intentionally excluded from Git.
 
 ## APK validation and publication
 
-`.github/workflows/build-apk.yml` validates PRs and builds/publishes on main:
+`.github/workflows/build-apk.yml` validates PRs and builds on main/session branches:
 
-- Flutter 3.24.5, Java 17, Android compile SDK 35, AGP 8.6.1, Kotlin 2.1.10.
-- Dependency versions and package hashes are pinned in `pubspec.lock`;
-  CI uses `flutter pub get --enforce-lockfile`.
-- Analyzer warnings/errors or failed tests fail the job and prevent APK
-  compilation/publication. They must not be suppressed with `|| true`.
-- Tests include independent PyNaCl/libsodium sealed-box vectors, message
-  boundary cases, round trips, and rejection of tampered/invalid input.
-- Encryption uses PineNaCl/TweetNaCl instead of hand-written cipher primitives.
-- Detailed logs and the resolved lockfile are saved in `build-diagnostics`.
-  Short diagnostic messages also appear in GitHub check annotations.
-- Successful main builds publish the universal Android APK and its SHA-256
-  checksum to the `apk-latest` prerelease; the APK artifact is retained 30 days.
+- Flutter 3.24.5, Java 17, Android compile SDK 35, NDK 26.1.10909125, AGP 8.6.1,
+  and Kotlin 2.1.10.
+- CI runs `flutter pub get`, analyzer, tests, and a non-published Debug APK
+  validation build. Pub's resolved lockfile is included in build diagnostics.
+- A Release APK requires the same persistent `nova-release.jks`, alias
+  `nova_release`, and four `NOVA_RELEASE_*` Actions secrets for every build.
+  Missing secrets fail Release packaging; there is no Debug/unsigned fallback.
+  CI checks `applicationId`, APK signature and certificate SHA-256, then
+  calculates the APK SHA-256 before publishing. The JKS exists only in the
+  runner's temporary directory and is removed after the job.
+- Analyzer/test/build diagnostics are retained for seven days; only a
+  signature-verified Release APK artifact is retained for 30 days. Successful
+  main builds publish the APK and checksum to the `apk-latest` prerelease.
 
-Direct APK URL:
+Direct APK URL from the **previous** main release:
 https://github.com/abiedadam0077/1ppwin/releases/download/apk-latest/NOVA-Windows-Cloud.apk
 
-Verify a **successful main run** (not only a PR run) and the release asset
-before sharing that URL. PR runs deliberately do not publish releases.
+That is not the new signed release. The older Gradle configuration used Debug
+signing, and its certificate could not be downloaded from this sandbox for
+comparison; do not assume it can be upgraded in place. A new public link should
+be shared only after a successful signature-verified build. PR runs deliberately
+do not publish APKs.
 
 ## Sign-in
 

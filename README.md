@@ -126,3 +126,13 @@
    Actions (R/W)، Secrets (R/W)، Contents (R/W)، Administration (R/W اختياري لإنشاء ريبو)، Profile (R).
 3. ثبّت الـ App على الريبو ديالك (Install App).
 4. شغّل الـ APK، سجل الدخول، اختار الريبو، دخل الأسرار، وشغّل Windows. 🚀
+
+---
+
+## 🎮 Minecraft Java Cloud (ميزة مستقلة)
+
+التطبيق يوفّر أيضاً جلسة Linux مستقلة لـ **Minecraft Java Edition** بسير عمل خاص، ومستودع GitHub خاص منفصل عن مستودع Windows. المصادقة تتم عبر تسجيل Microsoft الرسمي (PKCE)، والنسخ الاحتياطية للعوالم فقط تُشفّر قبل حفظها في GitHub Releases. ما كيتبدل لا Windows Workflow لا Tailscale.
+
+راجع [دليل إعداد Minecraft Java Cloud](docs/MINECRAFT_CLOUD.md) قبل الاستخدام؛ ستحتاج Microsoft App Client ID وثلاثة Actions Secrets، ويجب أن يملك الحساب اللعبة. العرض يستخدم Mesa برمجياً، لذلك GPU وFPS والـlatency ماشي مضمونين، والإيقاف الآمن ضروري باش تترفع نسخة العالم.
+
+> **الحالة:** التنفيذ موجود لكن لم يُختبر بعد ببناء Flutter/Android أو تسجيل Microsoft وتشغيل GitHub Actions حقيقي. لا تعتبره جاهزاً للإنتاج حتى تنجح الاختبارات والجلسة التجريبية الموثقة فالدليل.

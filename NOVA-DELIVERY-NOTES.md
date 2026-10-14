@@ -70,3 +70,14 @@ URI is `novawindowscloud://oauth/callback`. Do not embed a client secret or
 access token in the APK. VM secrets are configured through the app at runtime.
 CI compilation/unit tests do not replace testing GitHub login and a real
 Windows VM session on an Android device.
+
+## Minecraft Offline profiles — 2026-10-14
+
+- Added an explicit Microsoft/Offline account choice to Minecraft Java Cloud. Offline mode takes a 3–16 character local name, saves selectable profiles in app preferences, and sends `auth_mode` plus `offline_username` through GitHub workflow dispatch.
+- The workflow never invokes Microsoft OAuth in Offline mode and passes an empty access-token argument. It computes the standard deterministic local `OfflinePlayer:<name>` UUID and patches the `userType` argument for legacy client versions at the 22w43a boundary. The UI and docs state that this is not an official Java account and official online-authentication servers can reject it.
+- Older installed Minecraft workflows are detected by schema/input inspection and require confirmation before updating. Only `.github/workflows/minecraft-cloud.yml` in the selected Minecraft repository is touched; Windows Cloud, Tailscale, `applicationId`, and signing configuration remain unchanged.
+- Source comparison: MojoLauncher separates local accounts from Microsoft authentication and uses `userType=mojang` before 22w43a / `msa` afterward; `minecraft-launcher-lib` 8.0 allows empty test tokens but hard-codes the MSA launch placeholder. NOVA keeps the flows separate, uses an empty token rather than Mojo's `0` sentinel, and patches only the local launch argument. See `docs/MINECRAFT_CLOUD.md` for source links.
+- Local checks: workflow YAML parsed; all 8 embedded Bash blocks passed `bash -n`; all 6 embedded Python heredocs parsed; offline UUID, empty token, and the `22w43a` type boundary were exercised with local Python checks. No Minecraft Actions workflow was started.
+- GitHub APK CI [run 38630858042](https://github.com/abiedadam0077/1ppwin/actions/runs/38630858042) passed Analyze, all 41 Flutter tests, Debug/Release builds, package ID (`app.nova.windowscloud`) and release-certificate checks. The Release APK is 56.4 MB; build version is `1.0.2+3`.
+- Download the 30-day Actions artifact [NOVA-Windows-Cloud-APK](https://github.com/abiedadam0077/1ppwin/actions/runs/38630858042/artifacts/11927457126); it contains the signed APK and `NOVA-Windows-Cloud.apk.sha256`. The sandbox could not download the archive itself because GitHub redirects it to an artifact-storage host outside the sandbox's outbound allowlist; the artifact remains available from the run link.
+- Neither a phone installation nor a live Minecraft/Microsoft session was executed. CI signature verification checks the configured persistent release keystore, but does not independently compare against the certificate of every older APK.

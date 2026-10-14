@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060b18">
+  <title>NOVA — UI redesign review</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="design-a">
+  <header class="studio-header">
+    <div class="studio-brand" dir="ltr">
+      <div class="studio-mark" aria-hidden="true">N</div>
+      <div><strong>NOVA</strong><span>WINDOWS CLOUD · DESIGN REVIEW</span></div>
+    </div>
+    <div class="studio-intro">
+      <div>
+        <p class="eyebrow">مراجعة الاتجاه البصري</p>
+        <h1>بديلان لكل شاشة، بنفس الوظائف الحقيقية</h1>
+        <p class="studio-copy">اختر شاشة من الفهرس، ثم بدّل بين A وB واستعرض حالاتها. كل شاشة تظهر منفردة بمقاس هاتف كامل؛ لا توجد لوحة صور مجمّعة.</p>
+      </div>
+      <div class="prototype-note" role="note">
+        <span class="note-dot" aria-hidden="true"></span>
+        <span>نموذج بصري فقط — القيم التوضيحية غير متصلة بـGitHub ولا تمثل حالة حساب حقيقية.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="studio-layout">
+    <aside class="screen-rail" aria-label="فهرس الشاشات">
+      <div class="rail-heading">
+        <div><span class="eyebrow">جميع الأسطح</span><h2>فهرس الشاشات</h2></div>
+        <span class="screen-count" id="screenCount">24</span>
+      </div>
+      <nav id="screenList" class="screen-list" aria-label="التنقل بين الشاشات"></nav>
+      <p class="rail-footnote">تتضمن الحالات المخفية خلف الأزرار والقوائم والحوارات.</p>
+    </aside>
+
+    <section class="workbench" aria-label="معاينة التصميم">
+      <div class="toolbar">
+        <div class="screen-heading">
+          <span class="eyebrow" id="screenGroup">الشاشة</span>
+          <h2 id="screenTitle">لوحة التحكم</h2>
+          <p id="screenDescription">مقارنة تسلسل المعلومات وحالة النظام.</p>
+        </div>
+        <div class="toolbar-controls">
+          <div class="variant-control" role="group" aria-label="اختيار الاتجاه البصري">
+            <button id="designA" class="variant-button is-active" type="button" aria-pressed="true">A <span>غرفة التحكم</span></button>
+            <button id="designB" class="variant-button" type="button" aria-pressed="false">B <span>أورورا</span></button>
+          </div>
+          <label class="select-control"><span>الحالة</span><select id="stateSelect" aria-label="اختيار حالة الشاشة"></select></label>
+          <label class="select-control locale-control"><span>اللغة</span><select id="localeSelect" aria-label="لغة المعاينة"><option value="ar">العربية · RTL</option><option value="en">English · LTR</option></select></label>
+        </div>
+      </div>
+
+      <div class="preview-stage">
+        <div class="device-frame" aria-label="معاينة هاتف Android">
+          <div id="screenMount" class="screen-mount"></div>
+        </div>
+      </div>
+      <div class="preview-caption">
+        <span class="caption-badge" id="captionVariant">A · غرفة التحكم</span>
+        <p id="captionText">محتوى الصفحة قابل للتمرير. استخدم القائمة لاختبار شاشة أخرى، واختر الحالة لمراجعة التحميل والفراغ والخطأ والنجاح والتأكيد.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="studio-footer">
+    <span>المراجعة لا تغيّر كود التطبيق أو بيانات الحساب.</span>
+    <a href="../../docs/ui-redesign-audit.md">فتح تقرير التدقيق ومواصفات التنفيذ</a>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

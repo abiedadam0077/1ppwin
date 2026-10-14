@@ -50,10 +50,9 @@ class MinecraftVersionManifest {
     required this.versions,
   });
 
-  static const Uri officialUri = Uri(
-    scheme: 'https',
-    host: 'piston-meta.mojang.com',
-    path: '/mc/game/version_manifest_v2.json',
+  static final Uri officialUri = Uri.https(
+    'piston-meta.mojang.com',
+    '/mc/game/version_manifest_v2.json',
   );
 
   static MinecraftVersionManifest parse(String body) {

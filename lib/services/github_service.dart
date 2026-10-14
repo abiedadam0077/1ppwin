@@ -98,6 +98,21 @@ class WorkflowInspection {
   }
 }
 
+/// Detects Minecraft workflow files that predate account-mode inputs.
+/// Older installed workflows must be updated before NOVA dispatches the new
+/// `auth_mode` and `offline_username` inputs; GitHub rejects undeclared inputs.
+class MinecraftWorkflowInspection {
+  static const String schemaMarker = '# NOVA_MINECRAFT_WORKFLOW_SCHEMA: 2';
+  static const List<String> requiredDispatchInputs = ['auth_mode', 'offline_username'];
+
+  static bool needsUpdate(String? yaml) {
+    if (yaml == null || !yaml.contains(schemaMarker)) return true;
+    return requiredDispatchInputs.any(
+      (name) => !RegExp('^ {6}${RegExp.escape(name)}:\\s*$', multiLine: true).hasMatch(yaml),
+    );
+  }
+}
+
 class SecretsCheckResult {
   final List<String> names;
   final bool permissionDenied;
@@ -486,6 +501,27 @@ class GitHubService {
       return true;
     } on GhException catch (e) {
       if (e.status == 404) return false;
+      rethrow;
+    }
+  }
+
+  /// Returns the decoded content of a workflow file, or null when it is absent.
+  /// The filename is constrained to a single YAML filename under workflows.
+  Future<String?> workflowFileContent(String repo, String workflowFile, {String? branch}) async {
+    if (!RegExp(r'^[A-Za-z0-9._-]+\.ya?ml$').hasMatch(workflowFile)) {
+      throw ArgumentError.value(workflowFile, 'workflowFile', 'Expected a workflow filename.');
+    }
+    final ref = branch == null ? '' : '?ref=${Uri.encodeQueryComponent(branch)}';
+    try {
+      final response = await _send(
+        'GET',
+        '/repos/$repo/contents/.github/workflows/$workflowFile$ref',
+      ) as Map<String, dynamic>;
+      final encoded = (response['content'] as String? ?? '').replaceAll(RegExp(r'\s'), '');
+      if (encoded.isEmpty) return '';
+      return utf8.decode(base64Decode(encoded), allowMalformed: true);
+    } on GhException catch (e) {
+      if (e.status == 404) return null;
       rethrow;
     }
   }

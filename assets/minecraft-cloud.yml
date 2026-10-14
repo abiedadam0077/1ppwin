@@ -1,3 +1,4 @@
+# NOVA_MINECRAFT_WORKFLOW_SCHEMA: 2
 name: Minecraft Java Cloud
 
 # Independent Linux desktop session for the Java Edition. The runner and its
@@ -6,6 +7,17 @@ name: Minecraft Java Cloud
 on:
   workflow_dispatch:
     inputs:
+      auth_mode:
+        description: Choose official Microsoft sign-in or a local Offline profile
+        type: choice
+        options: [microsoft, offline]
+        default: microsoft
+        required: true
+      offline_username:
+        description: Local player name used only when auth_mode is offline (3-16 letters, digits, or underscore)
+        type: string
+        required: false
+        default: ''
       version:
         description: Official Minecraft Java version ID from the in-app list
         type: string
@@ -66,9 +78,11 @@ jobs:
         id: preflight
         env:
           GH_TOKEN: ${{ github.token }}
-          MC_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MC_CLIENT_ID: ${{ inputs.auth_mode == 'microsoft' && secrets.MICROSOFT_CLIENT_ID || '' }}
           MC_VIEWER_PASSWORD: ${{ secrets.MINECRAFT_ACCESS_PASSWORD }}
           MC_BACKUP_PASSWORD: ${{ secrets.MINECRAFT_BACKUP_PASSWORD }}
+          MC_AUTH_MODE_INPUT: ${{ inputs.auth_mode }}
+          MC_OFFLINE_USERNAME_INPUT: ${{ inputs.offline_username }}
           MC_VERSION_INPUT: ${{ inputs.version }}
           MC_HOURS_INPUT: ${{ inputs.hours }}
           MC_MEMORY_INPUT: ${{ inputs.memory_gb }}
@@ -84,10 +98,9 @@ jobs:
             echo "::error::Minecraft world backups require a private GitHub repository."
             exit 1
           fi
-          for name in MC_CLIENT_ID MC_VIEWER_PASSWORD MC_BACKUP_PASSWORD; do
+          for name in MC_VIEWER_PASSWORD MC_BACKUP_PASSWORD; do
             if [ -z "${!name:-}" ]; then
               case "$name" in
-                MC_CLIENT_ID) secret_name=MICROSOFT_CLIENT_ID ;;
                 MC_VIEWER_PASSWORD) secret_name=MINECRAFT_ACCESS_PASSWORD ;;
                 MC_BACKUP_PASSWORD) secret_name=MINECRAFT_BACKUP_PASSWORD ;;
               esac
@@ -95,6 +108,24 @@ jobs:
               exit 1
             fi
           done
+          case "$MC_AUTH_MODE_INPUT" in
+            microsoft)
+              if [ -z "${MC_CLIENT_ID:-}" ]; then
+                echo "::error::Microsoft mode requires the MICROSOFT_CLIENT_ID Actions secret."
+                exit 1
+              fi
+              [[ "$MC_CLIENT_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || {
+                echo "::error::MICROSOFT_CLIENT_ID must be a GUID-format public application ID."; exit 1;
+              }
+              ;;
+            offline)
+              [[ "$MC_OFFLINE_USERNAME_INPUT" =~ ^[A-Za-z0-9_]{3,16}$ ]] || {
+                echo "::error::Offline mode requires a local name with 3-16 ASCII letters, digits, or underscores."; exit 1;
+              }
+              ;;
+            *)
+              echo "::error::Unsupported Minecraft account mode."; exit 1 ;;
+          esac
           [[ "$MC_VERSION_INPUT" =~ ^[A-Za-z0-9._+-]{1,40}$ ]] || { echo "::error::Invalid Minecraft version ID."; exit 1; }
           [[ "$MC_HOURS_INPUT" =~ ^[1-4]$ ]] || { echo "::error::Session duration must be between 1 and 4 hours."; exit 1; }
           [[ "$MC_MEMORY_INPUT" =~ ^(2|4|6|8)$ ]] || { echo "::error::Unsupported Java heap selection."; exit 1; }
@@ -128,6 +159,8 @@ jobs:
               raise SystemExit('::error::The requested version is not present in Mojang’s current official Java version manifest.')
           print('Confirmed requested Java version in Mojang official metadata.')
           PY
+          echo "MC_AUTH_MODE=$MC_AUTH_MODE_INPUT" >> "$GITHUB_ENV"
+          echo "MC_OFFLINE_USERNAME=$MC_OFFLINE_USERNAME_INPUT" >> "$GITHUB_ENV"
           echo "MC_VERSION=$MC_VERSION_INPUT" >> "$GITHUB_ENV"
           echo "MC_HOURS=$MC_HOURS_INPUT" >> "$GITHUB_ENV"
           echo "MC_MEMORY_GB=$MC_MEMORY_INPUT" >> "$GITHUB_ENV"
@@ -407,12 +440,14 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Authenticate Microsoft account, install, and run Minecraft Java
+      - name: Authenticate selected account, install, and run Minecraft Java
         id: launch
         if: ${{ steps.viewer.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ inputs.auth_mode == 'microsoft' && secrets.MICROSOFT_CLIENT_ID || '' }}
+          MINECRAFT_AUTH_MODE: ${{ inputs.auth_mode }}
+          MINECRAFT_OFFLINE_USERNAME: ${{ inputs.offline_username }}
           MINECRAFT_VERSION: ${{ inputs.version }}
           MINECRAFT_MEMORY_GB: ${{ inputs.memory_gb }}
           MINECRAFT_RESOLUTION: ${{ inputs.resolution }}
@@ -426,6 +461,7 @@ jobs:
           export LIBGL_ALWAYS_SOFTWARE=1
           export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
           cat > "$RUNNER_TEMP/nova-minecraft-launcher.py" <<'PY'
+          import hashlib
           import http.server
           import json
           import os
@@ -440,10 +476,14 @@ jobs:
           import time
           import urllib.parse
           import urllib.request
+          import uuid
+          from datetime import datetime, timezone
 
           import minecraft_launcher_lib as minecraft
 
-          CLIENT_ID = os.environ['MICROSOFT_CLIENT_ID']
+          CLIENT_ID = os.environ.get('MICROSOFT_CLIENT_ID', '')
+          AUTH_MODE = os.environ.get('MINECRAFT_AUTH_MODE', '')
+          OFFLINE_USERNAME = os.environ.get('MINECRAFT_OFFLINE_USERNAME', '')
           REDIRECT_URI = 'http://localhost:47831'
           MC_DIR = pathlib.Path(os.environ['MC_HOME'])
           VERSION = os.environ['MINECRAFT_VERSION']
@@ -485,6 +525,8 @@ jobs:
               allow_reuse_address = True
 
           def microsoft_login():
+              if not CLIENT_ID:
+                  raise RuntimeError('Microsoft mode requires the configured public-client application ID.')
               callback_queue = queue.Queue(maxsize=1)
               class CallbackHandler(http.server.BaseHTTPRequestHandler):
                   def do_GET(self):
@@ -577,7 +619,35 @@ jobs:
               runtime = next((candidate for candidate in (8, 11, 17, 21, 25) if candidate >= major), None)
               if runtime is None:
                   raise RuntimeError(f'This workflow supports Java requirements through Java 25, not Java {major}.')
-              return runtime
+              try:
+                  release_time = datetime.fromisoformat(entry['releaseTime'].replace('Z', '+00:00'))
+                  if release_time.tzinfo is None:
+                      release_time = release_time.replace(tzinfo=timezone.utc)
+              except (KeyError, TypeError, ValueError) as error:
+                  if AUTH_MODE == 'offline':
+                      raise RuntimeError('Mojang metadata did not include a valid release time for Offline compatibility.') from error
+                  return runtime, 'msa'
+              msa_arguments = datetime(2022, 10, 26, tzinfo=timezone.utc)
+              user_type = 'msa' if release_time.astimezone(timezone.utc) >= msa_arguments else 'mojang'
+              return runtime, user_type
+
+          def make_offline_profile(username):
+              if not re.fullmatch(r'[A-Za-z0-9_]{3,16}', username):
+                  raise RuntimeError('Offline profile name must be 3-16 ASCII letters, digits, or underscores.')
+              # Match Java UUID.nameUUIDFromBytes for OfflinePlayer:<name> so the
+              # same local profile keeps a stable identity in worlds and offline-mode servers.
+              raw = bytearray(hashlib.md5(('OfflinePlayer:' + username).encode('utf-8')).digest())
+              raw[6] = (raw[6] & 0x0f) | 0x30
+              raw[8] = (raw[8] & 0x3f) | 0x80
+              return {'name': username, 'id': str(uuid.UUID(bytes=bytes(raw))), 'access_token': ''}
+
+          def patch_user_type_argument(command, user_type):
+              # minecraft-launcher-lib 8.0 currently hard-codes `${user_type}` to
+              # `msa`; local launches before 22w43a need Mojang's legacy label.
+              for index, argument in enumerate(command[:-1]):
+                  if argument == '--userType':
+                      command[index + 1] = user_type
+              return command
 
           def write_game_options():
               MC_DIR.mkdir(parents=True, exist_ok=True)
@@ -630,13 +700,23 @@ jobs:
           def main():
               if not re.fullmatch(r'[A-Za-z0-9._+-]{1,40}', VERSION):
                   raise RuntimeError('Invalid Minecraft version ID.')
-              java_major = version_java_major()
+              java_major, offline_user_type = version_java_major()
               java_home = pathlib.Path(os.environ.get(f'JAVA_HOME_{java_major}_X64', ''))
               java = java_home / 'bin' / 'java'
               if not java.is_file():
                   raise RuntimeError(f'The configured Java {java_major} runtime is not available.')
 
-              account = microsoft_login()
+              if AUTH_MODE == 'microsoft':
+                  account = microsoft_login()
+                  launch_user_type = 'msa'
+                  print('[Minecraft account] Using official Microsoft sign-in and verified Java ownership.', flush=True)
+              elif AUTH_MODE == 'offline':
+                  account = make_offline_profile(OFFLINE_USERNAME)
+                  launch_user_type = offline_user_type
+                  print('[Minecraft account] Using a local Offline profile; Microsoft sign-in and Microsoft tokens are not used.', flush=True)
+              else:
+                  raise RuntimeError('Unsupported Minecraft account mode.')
+
               print(f'[Minecraft install] Installing official Java Edition {VERSION} and verified dependencies.', flush=True)
               callback = {'setStatus': progress_status}
               minecraft.install.install_minecraft_version(VERSION, str(MC_DIR), callback=callback)
@@ -647,7 +727,7 @@ jobs:
                   'username': account['name'],
                   'uuid': account['id'],
                   'token': access_token,
-                  'user_type': 'msa',
+                  'user_type': launch_user_type,
                   'executablePath': str(java),
                   'defaultExecutablePath': str(java),
                   'gameDirectory': str(MC_DIR),
@@ -662,9 +742,14 @@ jobs:
                   'launcherVersion': '1.0',
               }
               command = minecraft.command.get_minecraft_command(VERSION, str(MC_DIR), options)
+              if AUTH_MODE == 'offline':
+                  command = patch_user_type_argument(command, launch_user_type)
               child_env = os.environ.copy()
               for key in list(child_env):
-                  if key.startswith(('GITHUB_', 'RUNNER_')) or key in ('GH_TOKEN', 'GITHUB_TOKEN'):
+                  if key.startswith(('GITHUB_', 'RUNNER_')) or key in (
+                      'GH_TOKEN', 'GITHUB_TOKEN', 'MICROSOFT_CLIENT_ID',
+                      'MINECRAFT_AUTH_MODE', 'MINECRAFT_OFFLINE_USERNAME',
+                  ):
                       child_env.pop(key, None)
               with open(os.devnull, 'wb') as quiet_output:
                   process = subprocess.Popen(

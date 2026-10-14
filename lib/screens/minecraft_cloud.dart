@@ -13,6 +13,7 @@ import '../core/l10n.dart';
 import '../core/theme.dart';
 import '../core/widgets.dart';
 import '../services/github_service.dart';
+import '../services/minecraft_auth.dart';
 import '../services/minecraft_versions.dart';
 import '../state/app_state.dart';
 
@@ -28,6 +29,7 @@ class MinecraftCloudScreen extends StatefulWidget {
 class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
   final _repoName = TextEditingController();
   final _clientId = TextEditingController();
+  final _offlineUsername = TextEditingController();
   final _viewerPassword = TextEditingController();
   final _backupPassword = TextEditingController();
   final _versionService = MinecraftVersionService();
@@ -58,7 +60,10 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
   String? _refreshingRepo;
   bool _savingSecrets = false;
   bool _workflowExists = false;
+  bool _workflowNeedsUpdate = false;
   bool _stopRequested = false;
+  String _authMode = MinecraftAccountMode.microsoft;
+  List<String> _offlineProfiles = [];
   bool _restored = false;
   bool _initializing = false;
 
@@ -68,16 +73,28 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
   }
 
   bool get _secretsReady =>
-      _secretNames.contains(Const.secretMinecraftClientId) &&
       _secretNames.contains(Const.secretMinecraftAccess) &&
-      _secretNames.contains(Const.secretMinecraftBackup);
+      _secretNames.contains(Const.secretMinecraftBackup) &&
+      (_authMode == MinecraftAccountMode.offline ||
+          _secretNames.contains(Const.secretMinecraftClientId));
+
+  bool get _offlineUsernameValid =>
+      MinecraftAccountMode.isValidOfflineUsername(_offlineUsername.text.trim());
+
+  bool get _canStart =>
+      _secretsReady &&
+      (_authMode != MinecraftAccountMode.offline || _offlineUsernameValid);
+
+  String get _requiredSecretsMessageKey => _authMode == MinecraftAccountMode.offline
+      ? 'minecraft_secrets_required_offline'
+      : 'minecraft_secrets_required_microsoft';
 
   @override
   void initState() {
     super.initState();
     _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (mounted && (_isActive || _dispatchRequestedAt != null)) {
-        _refreshRepo(showSpinner: false);
+        _refreshRepo(showSpinner: false, inspectWorkflow: false);
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
@@ -88,6 +105,7 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     _pollTimer?.cancel();
     _repoName.dispose();
     _clientId.dispose();
+    _offlineUsername.dispose();
     _viewerPassword.dispose();
     _backupPassword.dispose();
     super.dispose();
@@ -109,7 +127,20 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
+      final savedOfflineProfiles = (prefs.getStringList('minecraft_offline_profiles') ?? const <String>[])
+          .where(MinecraftAccountMode.isValidOfflineUsername)
+          .toSet()
+          .toList()
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      _offlineUsername.text = prefs.getString('minecraft_offline_username') ?? '';
       setState(() {
+        _authMode = _storedChoice(
+          prefs,
+          'minecraft_auth_mode',
+          const [MinecraftAccountMode.microsoft, MinecraftAccountMode.offline],
+          MinecraftAccountMode.microsoft,
+        );
+        _offlineProfiles = savedOfflineProfiles;
         _hours = _storedChoice(prefs, 'minecraft_hours', const ['1', '2', '3', '4'], '2');
         _memoryGb = _storedChoice(prefs, 'minecraft_memory_gb', const ['2', '4', '6', '8'], '4');
         _resolution = _storedChoice(prefs, 'minecraft_resolution', const ['1280x720', '1600x900'], '1280x720');
@@ -164,7 +195,7 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     }
   }
 
-  Future<void> _refreshRepo({bool showSpinner = true}) async {
+  Future<void> _refreshRepo({bool showSpinner = true, bool inspectWorkflow = true}) async {
     final repo = _repo;
     final api = context.read<AppState>().api;
     if (repo == null || api == null || _refreshingRepo == repo.fullName) return;
@@ -172,11 +203,17 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     if (showSpinner && mounted) setState(() => _refreshBusy = true);
     try {
       final secrets = await api.checkSecrets(repo.fullName);
-      final workflow = await api.workflowFileExists(
-        repo.fullName,
-        Const.minecraftWorkflowFile,
-        branch: repo.defaultBranch,
-      );
+      final workflowYaml = inspectWorkflow
+          ? await api.workflowFileContent(
+              repo.fullName,
+              Const.minecraftWorkflowFile,
+              branch: repo.defaultBranch,
+            )
+          : null;
+      final workflow = inspectWorkflow ? workflowYaml != null : _workflowExists;
+      final workflowNeedsUpdate = inspectWorkflow
+          ? workflow && MinecraftWorkflowInspection.needsUpdate(workflowYaml)
+          : _workflowNeedsUpdate;
       final run = await api.latestWorkflowRun(repo.fullName, Const.minecraftWorkflowFile);
       final backups = await api.minecraftWorldBackups(repo.fullName);
 
@@ -193,6 +230,7 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
       setState(() {
         _secretNames = secrets.names;
         _workflowExists = workflow;
+        _workflowNeedsUpdate = workflowNeedsUpdate;
         _run = visibleRun;
         _steps = steps;
         _sessionInfo = info;
@@ -379,6 +417,7 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
       _backups = [];
       _secretNames = [];
       _workflowExists = false;
+      _workflowNeedsUpdate = false;
       _dispatchRequestedAt = null;
       _dispatchPreviousRunId = null;
       _error = null;
@@ -390,11 +429,12 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     final repo = _repo;
     final api = context.read<AppState>().api;
     if (repo == null || api == null) return false;
-    final exists = await api.workflowFileExists(
+    final existingWorkflow = await api.workflowFileContent(
       repo.fullName,
       Const.minecraftWorkflowFile,
       branch: repo.defaultBranch,
     );
+    final exists = existingWorkflow != null;
     if (exists && !allowOverwrite) {
       final t = L10n.of(context);
       final confirmed = await showDialog<bool>(
@@ -406,7 +446,10 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
           content: Text(t.t('minecraft_replace_workflow_body')),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(t.t('cancel'))),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(t.t('minecraft_install_workflow'))),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(t.t('minecraft_update_workflow')),
+            ),
           ],
         ),
       );
@@ -421,8 +464,19 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
       productName: 'Minecraft Java Cloud',
       workflowName: 'Minecraft',
     );
+    final installedWorkflow = await api.workflowFileContent(
+      repo.fullName,
+      Const.minecraftWorkflowFile,
+      branch: repo.defaultBranch,
+    );
+    if (MinecraftWorkflowInspection.needsUpdate(installedWorkflow)) {
+      throw StateError(L10n.of(context).t('minecraft_workflow_update_failed'));
+    }
     if (!mounted) return false;
-    setState(() => _workflowExists = true);
+    setState(() {
+      _workflowExists = true;
+      _workflowNeedsUpdate = false;
+    });
     await _refreshRepo();
     return true;
   }
@@ -437,6 +491,64 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     }
   }
 
+  void _setAuthMode(String mode) {
+    if (!MinecraftAccountMode.isValidMode(mode) || mode == _authMode) return;
+    setState(() => _authMode = mode);
+    unawaited(_persistAuthMode(mode));
+  }
+
+  Future<void> _persistAuthMode(String mode) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('minecraft_auth_mode', mode);
+    } catch (_) {
+      // Keep the selected mode usable for this session even if preferences fail.
+    }
+  }
+
+  void _selectOfflineProfile(String? username) {
+    if (username == null || !MinecraftAccountMode.isValidOfflineUsername(username)) return;
+    setState(() {
+      _offlineUsername.text = username;
+      _authMode = MinecraftAccountMode.offline;
+    });
+    unawaited(_persistOfflineSelection(username));
+  }
+
+  Future<void> _persistOfflineSelection(String username) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('minecraft_auth_mode', MinecraftAccountMode.offline);
+      await prefs.setString('minecraft_offline_username', username);
+    } catch (_) {
+      // Selection is also saved when the next session is dispatched.
+    }
+  }
+
+  Future<void> _saveOfflineProfile() async {
+    final username = _offlineUsername.text.trim();
+    if (!MinecraftAccountMode.isValidOfflineUsername(username)) {
+      setState(() => _error = L10n.of(context).t('minecraft_offline_username_invalid'));
+      return;
+    }
+    final profiles = <String>{..._offlineProfiles, username}.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('minecraft_offline_profiles', profiles);
+    await prefs.setString('minecraft_offline_username', username);
+    await prefs.setString('minecraft_auth_mode', MinecraftAccountMode.offline);
+    if (!mounted) return;
+    setState(() {
+      _offlineProfiles = profiles;
+      _offlineUsername.text = username;
+      _authMode = MinecraftAccountMode.offline;
+      _error = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(L10n.of(context).t('minecraft_offline_profile_saved'))),
+    );
+  }
+
   Future<void> _saveMinecraftSecrets() async {
     final repo = _repo;
     final api = context.read<AppState>().api;
@@ -444,14 +556,16 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     final clientId = _clientId.text.trim();
     final viewerPassword = _viewerPassword.text.trim();
     final backupPassword = _backupPassword.text.trim();
-    if (clientId.isNotEmpty &&
+    if (_authMode == MinecraftAccountMode.microsoft &&
+        clientId.isNotEmpty &&
         !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
             .hasMatch(clientId)) {
       setState(() => _error = L10n.of(context).t('minecraft_client_id_invalid'));
       return;
     }
     final secrets = <String, String>{
-      if (clientId.isNotEmpty) Const.secretMinecraftClientId: clientId,
+      if (_authMode == MinecraftAccountMode.microsoft && clientId.isNotEmpty)
+        Const.secretMinecraftClientId: clientId,
       if (viewerPassword.isNotEmpty) Const.secretMinecraftAccess: viewerPassword,
       if (backupPassword.isNotEmpty) Const.secretMinecraftBackup: backupPassword,
     };
@@ -466,9 +580,9 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
       setState(() {
         _secretNames = names;
         if (viewerPassword.isNotEmpty) _knownViewerPassword = viewerPassword;
-        _clientId.clear();
-        _viewerPassword.clear();
-        _backupPassword.clear();
+        if (secrets.containsKey(Const.secretMinecraftClientId)) _clientId.clear();
+        if (secrets.containsKey(Const.secretMinecraftAccess)) _viewerPassword.clear();
+        if (secrets.containsKey(Const.secretMinecraftBackup)) _backupPassword.clear();
       });
       await context.read<AppState>().log(
         'act_save_secrets',
@@ -502,6 +616,8 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
     await prefs.setString('minecraft_version_type', _versionType);
     if (_versionId != null) await prefs.setString('minecraft_version_id', _versionId!);
     await prefs.setString('minecraft_restore_tag', _restoreTag);
+    await prefs.setString('minecraft_auth_mode', _authMode);
+    await prefs.setString('minecraft_offline_username', _offlineUsername.text.trim());
   }
 
   Future<bool> _confirmRestoreVersion(MinecraftVersion selectedVersion) async {
@@ -545,6 +661,14 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
       setState(() => _error = L10n.of(context).t('minecraft_choose_version'));
       return;
     }
+    if (_authMode == MinecraftAccountMode.offline && !_offlineUsernameValid) {
+      setState(() => _error = L10n.of(context).t('minecraft_offline_username_invalid'));
+      return;
+    }
+    if (!_secretsReady) {
+      setState(() => _error = L10n.of(context).t(_requiredSecretsMessageKey));
+      return;
+    }
     if (!await _confirmRestoreVersion(version) || !mounted) return;
     setState(() {
       _busy = true;
@@ -557,18 +681,22 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
       _stopRequested = false;
     });
     try {
-      if (!_workflowExists && !(await _installWorkflow())) {
+      if ((!_workflowExists || _workflowNeedsUpdate) && !(await _installWorkflow())) {
         throw StateError(L10n.of(context).t('minecraft_workflow_required'));
       }
       await _saveOptions();
       if (!_secretsReady) {
-        throw StateError(L10n.of(context).t('minecraft_secrets_required'));
+        throw StateError(L10n.of(context).t(_requiredSecretsMessageKey));
       }
       await api.dispatchWorkflow(
         repo.fullName,
         Const.minecraftWorkflowFile,
         branch: repo.defaultBranch,
         inputs: {
+          ...MinecraftAccountMode.dispatchInputs(
+            mode: _authMode,
+            offlineUsername: _offlineUsername.text,
+          ),
           'version': version.id,
           'hours': _hours,
           'memory_gb': _memoryGb,
@@ -1116,11 +1244,17 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
                     GradientButton(
                       label: _busy ? t.t('minecraft_starting') : t.t('minecraft_start'),
                       icon: _busy ? Icons.hourglass_top_rounded : Icons.play_arrow_rounded,
-                      onPressed: _busy || _isActive || _dispatchRequestedAt != null || version == null || !_secretsReady ? null : _startMinecraft,
+                      onPressed: _busy || _isActive || _dispatchRequestedAt != null || version == null || !_canStart ? null : _startMinecraft,
                     ),
-                    if (!_secretsReady) ...[
+                    if (!_secretsReady || (_authMode == MinecraftAccountMode.offline && !_offlineUsernameValid)) ...[
                       const SizedBox(height: 7),
-                      Text(t.t('minecraft_secrets_required'), textAlign: TextAlign.center, style: const TextStyle(color: NovaTheme.warn, fontSize: 10.5)),
+                      Text(
+                        !_secretsReady
+                            ? t.t(_requiredSecretsMessageKey)
+                            : t.t('minecraft_offline_username_invalid'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: NovaTheme.warn, fontSize: 10.5),
+                      ),
                     ],
                   ],
                   if (_repo == null && !st.busy) ...[
@@ -1134,18 +1268,152 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
   }
 
   Widget _buildWorkflowAndSecrets(L10n t) {
+    final workflowReady = _workflowExists && !_workflowNeedsUpdate;
+    final workflowStatusKey = workflowReady
+        ? 'minecraft_workflow_ready'
+        : _workflowNeedsUpdate
+            ? 'minecraft_workflow_needs_update'
+            : 'minecraft_workflow_missing';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GlassCard(
           padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.person_rounded, color: NovaTheme.neonCyan),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      t.t('minecraft_account_mode'),
+                      style: const TextStyle(color: NovaTheme.text, fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    selected: _authMode == MinecraftAccountMode.microsoft,
+                    onSelected: _busy || _savingSecrets
+                        ? null
+                        : (selected) {
+                            if (selected) _setAuthMode(MinecraftAccountMode.microsoft);
+                          },
+                    avatar: const Icon(Icons.verified_user_outlined, size: 17),
+                    label: Text(t.t('minecraft_microsoft_account')),
+                  ),
+                  ChoiceChip(
+                    selected: _authMode == MinecraftAccountMode.offline,
+                    onSelected: _busy || _savingSecrets
+                        ? null
+                        : (selected) {
+                            if (selected) _setAuthMode(MinecraftAccountMode.offline);
+                          },
+                    avatar: const Icon(Icons.person_outline_rounded, size: 17),
+                    label: Text(t.t('minecraft_offline_account')),
+                  ),
+                ],
+              ),
+              if (_authMode == MinecraftAccountMode.offline) ...[
+                const SizedBox(height: 7),
+                Text(
+                  t.t('minecraft_offline_description'),
+                  style: const TextStyle(color: NovaTheme.textDim, fontSize: 11, height: 1.4),
+                ),
+                if (_offlineProfiles.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _offlineProfiles.contains(_offlineUsername.text.trim())
+                        ? _offlineUsername.text.trim()
+                        : null,
+                    decoration: InputDecoration(labelText: t.t('minecraft_saved_profiles')),
+                    hint: Text(t.t('minecraft_choose_saved_profile')),
+                    items: _offlineProfiles
+                        .map((username) => DropdownMenuItem(value: username, child: Text(username)))
+                        .toList(),
+                    onChanged: _busy ? null : _selectOfflineProfile,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _offlineUsername,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textCapitalization: TextCapitalization.none,
+                  textDirection: TextDirection.ltr,
+                  maxLength: 16,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9_]')),
+                    LengthLimitingTextInputFormatter(16),
+                  ],
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: t.t('minecraft_offline_username'),
+                    hintText: t.t('minecraft_offline_username_hint'),
+                    helperText: t.t('minecraft_offline_username_help'),
+                  ),
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: _busy || !_offlineUsernameValid ? null : _saveOfflineProfile,
+                    icon: const Icon(Icons.bookmark_add_outlined, size: 17),
+                    label: Text(t.t('minecraft_save_offline_profile')),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: NovaTheme.warn.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: NovaTheme.warn.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 17, color: NovaTheme.warn),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          t.t('minecraft_offline_warning'),
+                          style: const TextStyle(color: NovaTheme.warn, fontSize: 10.5, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        GlassCard(
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Icon(_workflowExists ? Icons.account_tree_rounded : Icons.build_circle_outlined, color: _workflowExists ? NovaTheme.ok : NovaTheme.warn),
+              Icon(
+                workflowReady ? Icons.account_tree_rounded : Icons.build_circle_outlined,
+                color: workflowReady ? NovaTheme.ok : NovaTheme.warn,
+              ),
               const SizedBox(width: 9),
-              Expanded(child: Text(_workflowExists ? t.t('minecraft_workflow_ready') : t.t('minecraft_workflow_missing'), style: const TextStyle(color: NovaTheme.text, fontSize: 12, fontWeight: FontWeight.w700))),
-              if (!_workflowExists)
-                TextButton(onPressed: _busy ? null : _installWorkflowFromButton, child: Text(t.t('minecraft_install_workflow'))),
+              Expanded(
+                child: Text(
+                  t.t(workflowStatusKey),
+                  style: const TextStyle(color: NovaTheme.text, fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (!workflowReady)
+                TextButton(
+                  onPressed: _busy ? null : _installWorkflowFromButton,
+                  child: Text(t.t(_workflowExists ? 'minecraft_update_workflow' : 'minecraft_install_workflow')),
+                ),
             ],
           ),
         ),
@@ -1159,41 +1427,60 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
                 children: [
                   const Icon(Icons.security_rounded, color: NovaTheme.neonPurpleSoft),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(t.t('minecraft_auth_and_secrets'), style: const TextStyle(color: NovaTheme.text, fontWeight: FontWeight.w800, fontSize: 13))),
+                  Expanded(
+                    child: Text(
+                      t.t('minecraft_auth_and_secrets'),
+                      style: const TextStyle(color: NovaTheme.text, fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
+                  ),
                   StatusBadge(label: _secretsReady ? t.t('ready') : t.t('not_ready'), color: _secretsReady ? NovaTheme.ok : NovaTheme.warn),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(t.t('minecraft_auth_help'), style: const TextStyle(color: NovaTheme.textDim, fontSize: 11, height: 1.45)),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton.icon(
-                  onPressed: () => launchUrl(
-                    Uri.parse('https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade'),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                  label: Text(t.t('minecraft_register_microsoft_app')),
-                ),
+              Text(
+                t.t(_authMode == MinecraftAccountMode.offline
+                    ? 'minecraft_offline_secret_help'
+                    : 'minecraft_auth_help'),
+                style: const TextStyle(color: NovaTheme.textDim, fontSize: 11, height: 1.45),
               ),
-              _secretStatusRow(t.t('minecraft_client_id'), Const.secretMinecraftClientId),
+              if (_authMode == MinecraftAccountMode.microsoft) ...[
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse('https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                    label: Text(t.t('minecraft_register_microsoft_app')),
+                  ),
+                ),
+                _secretStatusRow(t.t('minecraft_client_id'), Const.secretMinecraftClientId),
+                TextField(
+                  controller: _clientId,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textCapitalization: TextCapitalization.none,
+                  decoration: InputDecoration(
+                    labelText: t.t('minecraft_client_id'),
+                    hintText: t.t('minecraft_client_id_hint'),
+                  ),
+                ),
+              ],
               _secretStatusRow(t.t('minecraft_viewer_password'), Const.secretMinecraftAccess),
               _secretStatusRow(t.t('minecraft_backup_password'), Const.secretMinecraftBackup),
               const SizedBox(height: 8),
-              TextField(
-                controller: _clientId,
-                autocorrect: false,
-                enableSuggestions: false,
-                textCapitalization: TextCapitalization.none,
-                decoration: InputDecoration(labelText: t.t('minecraft_client_id'), hintText: t.t('minecraft_client_id_hint')),
-              ),
               TextField(
                 controller: _viewerPassword,
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: t.t('minecraft_viewer_password'),
                   hintText: t.t('minecraft_keep_secret_hint'),
-                  suffixIcon: IconButton(tooltip: t.t('minecraft_generate_password'), icon: const Icon(Icons.auto_awesome_rounded), onPressed: () => setState(() => _viewerPassword.text = _generatePassword())),
+                  suffixIcon: IconButton(
+                    tooltip: t.t('minecraft_generate_password'),
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    onPressed: () => setState(() => _viewerPassword.text = _generatePassword()),
+                  ),
                 ),
               ),
               TextField(
@@ -1202,7 +1489,11 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
                 decoration: InputDecoration(
                   labelText: t.t('minecraft_backup_password'),
                   hintText: t.t('minecraft_keep_secret_hint'),
-                  suffixIcon: IconButton(tooltip: t.t('minecraft_generate_password'), icon: const Icon(Icons.auto_awesome_rounded), onPressed: () => setState(() => _backupPassword.text = _generatePassword())),
+                  suffixIcon: IconButton(
+                    tooltip: t.t('minecraft_generate_password'),
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    onPressed: () => setState(() => _backupPassword.text = _generatePassword()),
+                  ),
                 ),
               ),
               const SizedBox(height: 9),
@@ -1212,7 +1503,10 @@ class _MinecraftCloudScreenState extends State<MinecraftCloudScreen> {
                 onPressed: _savingSecrets || _busy ? null : _saveMinecraftSecrets,
               ),
               const SizedBox(height: 6),
-              Text(t.t('minecraft_secret_storage_note'), style: const TextStyle(color: NovaTheme.textMuted, fontSize: 10.5, height: 1.4)),
+              Text(
+                t.t('minecraft_secret_storage_note'),
+                style: const TextStyle(color: NovaTheme.textMuted, fontSize: 10.5, height: 1.4),
+              ),
             ],
           ),
         ),

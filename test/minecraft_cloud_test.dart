@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nova_windows_cloud/core/const.dart';
 import 'package:nova_windows_cloud/core/l10n.dart';
 import 'package:nova_windows_cloud/services/github_service.dart';
+import 'package:nova_windows_cloud/services/minecraft_auth.dart';
 import 'package:nova_windows_cloud/services/minecraft_versions.dart';
 
 void main() {
@@ -15,6 +16,41 @@ void main() {
     expect(L10n('en').t('minecraft_status_running'), 'Session is running');
     expect(L10n('fr').t('minecraft_status_running'), 'Session en cours');
     expect(L10n('fr').t('minecraft_github_required'), contains('GitHub'));
+    expect(L10n('en').t('minecraft_offline_account'), 'Offline Account (local)');
+    expect(L10n('ar').t('minecraft_offline_warning'), contains('ليس حساب Java رسمياً'));
+    expect(L10n('fr').t('minecraft_workflow_needs_update'), contains('mis à jour'));
+  });
+
+  group('Minecraft Offline account mode', () {
+    test('accepts only Mojang-style 3-16 character local names', () {
+      expect(MinecraftAccountMode.isValidOfflineUsername('Steve'), isTrue);
+      expect(MinecraftAccountMode.isValidOfflineUsername('Alex_42'), isTrue);
+      expect(MinecraftAccountMode.isValidOfflineUsername('ab'), isFalse);
+      expect(MinecraftAccountMode.isValidOfflineUsername('this_name_is_way_too_long'), isFalse);
+      expect(MinecraftAccountMode.isValidOfflineUsername('not-a-name'), isFalse);
+      expect(MinecraftAccountMode.isValidOfflineUsername('مستخدم'), isFalse);
+      expect(
+        MinecraftAccountMode.dispatchInputs(mode: 'offline', offlineUsername: ' Alex_42 '),
+        {'auth_mode': 'offline', 'offline_username': 'Alex_42'},
+      );
+      expect(
+        MinecraftAccountMode.dispatchInputs(mode: 'microsoft', offlineUsername: 'ignored'),
+        {'auth_mode': 'microsoft', 'offline_username': ''},
+      );
+      expect(
+        () => MinecraftAccountMode.dispatchInputs(mode: 'offline', offlineUsername: 'invalid-name'),
+        throwsArgumentError,
+      );
+    });
+
+    test('does not label a local profile as Microsoft or official Java authentication', () async {
+      final workflow = await rootBundle.loadString('assets/minecraft-cloud.yml');
+      expect(workflow, contains("'access_token': ''"));
+      expect(workflow, contains('make_offline_profile(OFFLINE_USERNAME)'));
+      expect(workflow, contains('AUTH_MODE == \'microsoft\''));
+      expect(workflow, contains('AUTH_MODE == \'offline\''));
+      expect(workflow, contains('Microsoft sign-in and Microsoft tokens are not used'));
+    });
   });
 
   group('Mojang Java version manifest', () {
@@ -103,6 +139,29 @@ void main() {
   test('workflow is independent from Windows and never configures Tailscale', () async {
     final workflow = await rootBundle.loadString('assets/minecraft-cloud.yml');
     expect(workflow, contains('name: Minecraft Java Cloud'));
+    expect(workflow, contains(MinecraftWorkflowInspection.schemaMarker));
+    expect(workflow, contains('auth_mode:'));
+    expect(workflow, contains('offline_username:'));
+    expect(MinecraftWorkflowInspection.needsUpdate(workflow), isFalse);
+    expect(MinecraftWorkflowInspection.needsUpdate(null), isTrue);
+    const legacyWorkflow = '''
+      name: Minecraft Java Cloud
+      on:
+        workflow_dispatch:
+          inputs:
+            version:
+              type: string
+      ''';
+    expect(MinecraftWorkflowInspection.needsUpdate(legacyWorkflow), isTrue);
+    const incompleteSchema = '''
+      # NOVA_MINECRAFT_WORKFLOW_SCHEMA: 2
+      on:
+        workflow_dispatch:
+          inputs:
+            version:
+              type: string
+      ''';
+    expect(MinecraftWorkflowInspection.needsUpdate(incompleteSchema), isTrue);
     expect(workflow, contains('minecraft-launcher-lib==8.0'));
     expect(workflow, contains("java-version: '8, 11, 17, 21, 25'"));
     expect(workflow, contains('MINECRAFT_ACCESS_PASSWORD'));

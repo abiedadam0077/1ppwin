@@ -131,8 +131,6 @@
 
 ## 🎮 Minecraft Java Cloud (ميزة مستقلة)
 
-التطبيق يوفّر أيضاً جلسة Linux مستقلة لـ **Minecraft Java Edition** بسير عمل خاص، ومستودع GitHub خاص منفصل عن مستودع Windows. المصادقة تتم عبر تسجيل Microsoft الرسمي (PKCE)، والنسخ الاحتياطية للعوالم فقط تُشفّر قبل حفظها في GitHub Releases. ما كيتبدل لا Windows Workflow لا Tailscale.
+التطبيق يوفّر أيضاً جلسة Linux مستقلة لـ **Minecraft Java Edition** بسير عمل خاص ومستودع GitHub خاص منفصل عن Windows. الاختيار واضح بين حساب Microsoft الرسمي (PKCE والتحقق من ملكية Java) وحساب Offline محلي باسم تختارو وتحفظو على الهاتف. الحساب المحلي ماشي حساب Java رسمي، والخوادم اللي كتطلب المصادقة الرسمية تقدر ترفضو. النسخ الاحتياطية للعوالم فقط كتتشفّر قبل حفظها في GitHub Releases؛ Windows Workflow وTailscale ما كيتبدلوش.
 
-راجع [دليل إعداد Minecraft Java Cloud](docs/MINECRAFT_CLOUD.md) قبل الاستخدام؛ ستحتاج Microsoft App Client ID وثلاثة Actions Secrets، ويجب أن يملك الحساب اللعبة. العرض يستخدم Mesa برمجياً، لذلك GPU وFPS والـlatency ماشي مضمونين، والإيقاف الآمن ضروري باش تترفع نسخة العالم.
-
-> **الحالة:** التنفيذ موجود لكن لم يُختبر بعد ببناء Flutter/Android أو تسجيل Microsoft وتشغيل GitHub Actions حقيقي. لا تعتبره جاهزاً للإنتاج حتى تنجح الاختبارات والجلسة التجريبية الموثقة فالدليل.
+راجع [دليل إعداد Minecraft Java Cloud](docs/MINECRAFT_CLOUD.md) قبل الاستخدام؛ كلمة مرور العارض وكلمة مرور النسخ الاحتياطي مطلوبتان في الوضعين، وMicrosoft Client ID مطلوب غير لحساب Microsoft. العرض كيعتمد على Mesa برمجياً، لذلك GPU وFPS والـlatency ماشي مضمونين، والإيقاف الآمن ضروري باش تترفع نسخة العالم.
